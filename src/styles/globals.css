@@ -1,0 +1,191 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+@import "tailwindcss";
+
+/* ========================================
+   Theme Custom Properties
+   ======================================== */
+
+:root {
+  /* Background */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
+  --bg-tertiary: #f3f4f6;
+
+  /* Text */
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+
+  /* Border */
+  --border: #e5e7eb;
+
+  /* Accent */
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+
+  /* Status */
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+
+  /* Surface */
+  --surface: #ffffff;
+  --surface-hover: #f9fafb;
+
+  /* Fonts */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", "Fira Code",
+    monospace;
+}
+
+html.dark {
+  /* Background */
+  --bg-primary: #030712;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+
+  /* Text */
+  --text-primary: #f3f4f6;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+
+  /* Border */
+  --border: #374151;
+
+  /* Accent */
+  --accent: #60a5fa;
+  --accent-hover: #3b82f6;
+
+  /* Status */
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --error: #f87171;
+
+  /* Surface */
+  --surface: #111827;
+  --surface-hover: #1f2937;
+}
+
+/* ========================================
+   Base Styles
+   ======================================== */
+
+html {
+  height: 100%;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  height: 100vh;
+  margin: 0;
+  overflow: hidden;
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-mono);
+}
+
+/* ========================================
+   Selection
+   ======================================== */
+
+::selection {
+  background-color: var(--accent);
+  color: #ffffff;
+}
+
+html.dark ::selection {
+  background-color: var(--accent);
+  color: #030712;
+}
+
+/* ========================================
+   Scrollbar Styles
+   ======================================== */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--text-muted);
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-secondary);
+}
+
+/* ========================================
+   Transition Utilities
+   ======================================== */
+
+.transition-theme {
+  transition: background-color 0.2s ease, color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.transition-fast {
+  transition: all 0.15s ease;
+}
+
+.transition-normal {
+  transition: all 0.2s ease;
+}
+
+.transition-slow {
+  transition: all 0.3s ease;
+}
+
+/* ========================================
+   Panel Resize Handle Styles
+   (for react-resizable-panels)
+   ======================================== */
+
+[data-panel-group-direction="horizontal"]
+  > [data-resize-handle] {
+  width: 1px;
+  background-color: var(--border);
+  transition: background-color 0.2s ease, width 0.2s ease;
+  cursor: col-resize;
+}
+
+[data-panel-group-direction="horizontal"]
+  > [data-resize-handle]:hover,
+[data-panel-group-direction="horizontal"]
+  > [data-resize-handle][data-resize-handle-active] {
+  width: 3px;
+  background-color: var(--accent);
+}
+
+[data-panel-group-direction="vertical"]
+  > [data-resize-handle] {
+  height: 1px;
+  background-color: var(--border);
+  transition: background-color 0.2s ease, height 0.2s ease;
+  cursor: row-resize;
+}
+
+[data-panel-group-direction="vertical"]
+  > [data-resize-handle]:hover,
+[data-panel-group-direction="vertical"]
+  > [data-resize-handle][data-resize-handle-active] {
+  height: 3px;
+  background-color: var(--accent);
+}
