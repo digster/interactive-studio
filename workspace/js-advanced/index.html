@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Particle System</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div id="controls">
+    <h2>Particle System</h2>
+
+    <div class="control-group">
+      <label for="particleCount">
+        Particles: <span id="particleCountValue">80</span>
+      </label>
+      <input type="range" id="particleCount" min="10" max="300" value="80">
+    </div>
+
+    <div class="control-group">
+      <label for="speed">
+        Speed: <span id="speedValue">1.0</span>
+      </label>
+      <input type="range" id="speed" min="1" max="30" value="10">
+    </div>
+
+    <div class="control-group">
+      <label for="connectRange">
+        Connection Range: <span id="connectRangeValue">120</span>
+      </label>
+      <input type="range" id="connectRange" min="30" max="250" value="120">
+    </div>
+
+    <div class="control-group">
+      <label for="mouseForce">
+        Mouse Attraction: <span id="mouseForceValue">0.5</span>
+      </label>
+      <input type="range" id="mouseForce" min="0" max="20" value="5">
+    </div>
+
+    <div class="button-group">
+      <button id="pauseBtn">Pause</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+
+    <div class="stats" id="stats">FPS: --</div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>

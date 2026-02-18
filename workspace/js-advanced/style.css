@@ -1,0 +1,117 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  overflow: hidden;
+  background: #0a0a1a;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #e0e0f0;
+}
+
+canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
+#controls {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 240px;
+  padding: 20px;
+  background: rgba(15, 15, 35, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(100, 120, 255, 0.15);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+#controls h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #7b8cff, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.control-group {
+  margin-bottom: 14px;
+}
+
+.control-group label {
+  display: block;
+  font-size: 0.75rem;
+  color: #9090b8;
+  margin-bottom: 6px;
+}
+
+.control-group label span {
+  color: #a78bfa;
+  font-weight: 600;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(100, 120, 255, 0.15);
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #7b8cff;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(123, 140, 255, 0.5);
+}
+
+.button-group {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.button-group button {
+  flex: 1;
+  padding: 8px 0;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid rgba(100, 120, 255, 0.25);
+  background: rgba(100, 120, 255, 0.08);
+  color: #b0b8e8;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.button-group button:hover {
+  background: rgba(100, 120, 255, 0.2);
+  color: #d0d8ff;
+  border-color: rgba(100, 120, 255, 0.4);
+}
+
+.button-group button.active {
+  background: rgba(167, 139, 250, 0.2);
+  border-color: rgba(167, 139, 250, 0.5);
+  color: #a78bfa;
+}
+
+.stats {
+  margin-top: 12px;
+  font-size: 0.7rem;
+  color: #606088;
+  text-align: center;
+}

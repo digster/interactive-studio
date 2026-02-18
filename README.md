@@ -72,4 +72,17 @@ interactive-studio/
   tests/              # Unit and E2E tests
 ```
 
+## Example Projects
+
+The `workspace/` directory ships with several example projects that demonstrate different capabilities:
+
+| Project | Language | Description |
+|---------|----------|-------------|
+| `hello-world` | HTML/CSS/JS | Basic starter project |
+| `python-hello-world` | Python | Core Python features: type hints, Fibonacci sequence, golden ratio calculation, multiplication table |
+| `js-advanced` | HTML/CSS/JS | Canvas-based particle system with glassmorphism controls, mouse attraction physics, and connection lines |
+| `python-viz` | Python | Unicode-based data visualization: bar charts, sparklines, scatter plots, histograms (no external dependencies) |
+
+These projects are auto-discovered at startup. Drop any folder into `workspace/` to add your own.
+
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed architecture documentation.

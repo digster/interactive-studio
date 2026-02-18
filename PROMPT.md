@@ -93,3 +93,7 @@ Tests written:
 6. `tests/unit/components/settings/SettingsPanel.test.tsx` - Tests for setting labels, close button, Escape, font size buttons with bounds, theme segmented control, toggle switches (wordWrap, minimap, autoSave), tab size control
 7. `tests/unit/components/project/NewProjectDialog.test.tsx` - Tests for dialog title, template rendering, validation errors (empty name, invalid chars, duplicate), template selection, close/cancel buttons, Escape, error clearing, button disabled state
 8. Updated `tests/unit/components/console/ConsolePanel.test.tsx` - Added tests for problem count badge, problems list rendering, clear problems button, severity icons/messages, file path info display
+
+---
+
+Implement the plan to add 3 new workspace example projects: python-hello-world, js-advanced, python-viz
