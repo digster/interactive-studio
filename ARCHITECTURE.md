@@ -55,7 +55,7 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 ### State Management (src/store/) - Zustand 5
 - **workspaceStore.ts** - Projects, file tree, active project, expanded directories (Set<string>)
 - **editorStore.ts** - Open tabs, active tab, content editing, cursor position, tab reordering
-- **executionStore.ts** - Running state, console entries (with UUID IDs), preview content/type, preview refresh key, problems list with severity/file/line tracking
+- **executionStore.ts** - Running state, console entries (with UUID IDs), preview content/type, preview refresh key, problems list with severity/file/line tracking, Python output accumulator (separate from previewContent for async streaming)
 - **settingsStore.ts** - Theme, font size, tab size, auto-save, word wrap, minimap
 - **uiStore.ts** - Sidebar/bottom panel/preview visibility and dimensions
 
@@ -80,7 +80,7 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 - **cmTheme.ts** - Light/dark theme creation for CodeMirror.
 
 ### Preview Components (src/components/preview/)
-- **PreviewPane.tsx** - Live HTML rendering via `<iframe srcdoc>` with `sandbox="allow-scripts"`. Supports HTML (with inlined CSS/JS assets), SVG (rendered), markdown/json/mermaid (raw). Refresh button triggers `requestRefresh()`. Shows placeholder when no previewable file is active.
+- **PreviewPane.tsx** - Live HTML rendering via `<iframe srcdoc>` with `sandbox="allow-scripts"`. Supports HTML (with inlined CSS/JS assets), SVG (rendered), markdown/json/mermaid (raw), and Python execution output. Python output auto-detects HTML (renders in iframe) vs plain text (renders in `<pre>`). Shows running spinner, "Run to see preview" placeholder, and blinking cursor during streaming. Refresh button triggers `requestRefresh()`.
 
 ### Console Components (src/components/console/)
 - **ConsolePanel.tsx** - Bottom panel with Console/Problems tab switcher. Console entries color-coded by type. Problems tab shows severity icons (error/warning), message, file path + line number. Clicking a problem opens the file. Badge count on Problems tab label. Clear button scoped to active tab.
@@ -131,9 +131,10 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 ### Python Execution
 1. User clicks run -> `invoke("run_python")` with project path and script name
 2. Backend checks for uv, creates venv if needed, spawns process
-3. stdout/stderr streamed via `python-output` events -> `executionStore` appends console entries
+3. stdout/stderr streamed via `python-output` events -> `executionStore` appends console entries + `pythonOutput` (stdout only)
 4. stderr parsed for traceback file/line info -> added as problems
-5. Process completion emits `python-exit` with exit code
+5. Process completion emits `python-exit` with exit code, sets `pythonOutputReady`
+6. Preview pane renders accumulated `pythonOutput` — auto-detects HTML for iframe rendering
 
 ### Project Management
 1. Workspace path set in workspaceStore

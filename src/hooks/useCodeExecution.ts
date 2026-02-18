@@ -40,6 +40,7 @@ export function useCodeExecution() {
             store.addProblem('error', data, parsed?.filePath, parsed?.line);
           } else {
             store.addConsoleEntry('log', data);
+            store.appendPythonOutput(data);
           }
         },
       );
@@ -51,6 +52,7 @@ export function useCodeExecution() {
           const store = useExecutionStore.getState();
 
           store.setRunning(false);
+          store.setPythonOutputReady(true);
 
           if (success) {
             store.addConsoleEntry('result', `Process exited with code ${code ?? 0}`);
@@ -91,7 +93,7 @@ export function useCodeExecution() {
 
     // For Python, run via Tauri backend
     if (activeTab.language === 'python') {
-      const { clearConsole, clearProblems, setRunning, addConsoleEntry } =
+      const { clearConsole, clearProblems, setRunning, addConsoleEntry, clearPythonOutput, setPreview } =
         useExecutionStore.getState();
 
       // Save file first
@@ -107,6 +109,8 @@ export function useCodeExecution() {
 
       clearConsole();
       clearProblems();
+      clearPythonOutput();
+      setPreview('', 'python');
 
       // Auto-open console panel
       useUIStore.getState().setBottomPanelVisible(true);

@@ -25,6 +25,12 @@ export function usePreview() {
       return;
     }
 
+    // For Python, just set the preview type — don't clear pythonOutput
+    if (pvType === 'python') {
+      useExecutionStore.getState().setPreview('', 'python');
+      return;
+    }
+
     if (timerRef.current) {
       clearTimeout(timerRef.current);
     }

@@ -11,6 +11,8 @@ describe('executionStore', () => {
       previewRefreshKey: 0,
       lastError: null,
       problems: [],
+      pythonOutput: '',
+      pythonOutputReady: false,
     });
   });
 
@@ -135,5 +137,36 @@ describe('executionStore', () => {
     const state = useExecutionStore.getState();
     expect(state.previewContent).toBe('');
     expect(state.previewType).toBe('none');
+  });
+
+  // --- Python output ---
+
+  it('should have empty pythonOutput in initial state', () => {
+    expect(useExecutionStore.getState().pythonOutput).toBe('');
+    expect(useExecutionStore.getState().pythonOutputReady).toBe(false);
+  });
+
+  it('should append to pythonOutput via appendPythonOutput', () => {
+    useExecutionStore.getState().appendPythonOutput('Hello ');
+    useExecutionStore.getState().appendPythonOutput('World\n');
+    expect(useExecutionStore.getState().pythonOutput).toBe('Hello World\n');
+  });
+
+  it('should clear pythonOutput and reset pythonOutputReady', () => {
+    useExecutionStore.getState().appendPythonOutput('data');
+    useExecutionStore.getState().setPythonOutputReady(true);
+
+    useExecutionStore.getState().clearPythonOutput();
+    const state = useExecutionStore.getState();
+    expect(state.pythonOutput).toBe('');
+    expect(state.pythonOutputReady).toBe(false);
+  });
+
+  it('should set pythonOutputReady via setPythonOutputReady', () => {
+    useExecutionStore.getState().setPythonOutputReady(true);
+    expect(useExecutionStore.getState().pythonOutputReady).toBe(true);
+
+    useExecutionStore.getState().setPythonOutputReady(false);
+    expect(useExecutionStore.getState().pythonOutputReady).toBe(false);
   });
 });

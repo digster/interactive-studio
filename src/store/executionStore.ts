@@ -9,7 +9,7 @@ export interface ConsoleEntry {
   timestamp: number;
 }
 
-export type PreviewType = 'html' | 'markdown' | 'mermaid' | 'svg' | 'json' | 'none';
+export type PreviewType = 'html' | 'markdown' | 'mermaid' | 'svg' | 'json' | 'python' | 'none';
 
 export type ProblemSeverity = 'error' | 'warning';
 
@@ -30,6 +30,8 @@ export interface ExecutionState {
   previewRefreshKey: number;
   lastError: string | null;
   problems: Problem[];
+  pythonOutput: string;
+  pythonOutputReady: boolean;
 
   setRunning: (running: boolean) => void;
   addConsoleEntry: (type: ConsoleEntryType, content: string) => void;
@@ -40,6 +42,9 @@ export interface ExecutionState {
   requestRefresh: () => void;
   addProblem: (severity: ProblemSeverity, message: string, filePath?: string, line?: number, column?: number) => void;
   clearProblems: () => void;
+  appendPythonOutput: (data: string) => void;
+  clearPythonOutput: () => void;
+  setPythonOutputReady: (ready: boolean) => void;
 }
 
 export const useExecutionStore = create<ExecutionState>()((set) => ({
@@ -50,6 +55,8 @@ export const useExecutionStore = create<ExecutionState>()((set) => ({
   previewRefreshKey: 0,
   lastError: null,
   problems: [],
+  pythonOutput: '',
+  pythonOutputReady: false,
 
   setRunning: (running) => set({ isRunning: running }),
 
@@ -108,4 +115,11 @@ export const useExecutionStore = create<ExecutionState>()((set) => ({
     })),
 
   clearProblems: () => set({ problems: [] }),
+
+  appendPythonOutput: (data) =>
+    set((state) => ({ pythonOutput: state.pythonOutput + data })),
+
+  clearPythonOutput: () => set({ pythonOutput: '', pythonOutputReady: false }),
+
+  setPythonOutputReady: (ready) => set({ pythonOutputReady: ready }),
 }));

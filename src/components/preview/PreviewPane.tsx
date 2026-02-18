@@ -1,12 +1,65 @@
-import { RotateCw, Eye } from 'lucide-react';
+import { RotateCw, Eye, Loader2, Play } from 'lucide-react';
 import { useExecutionStore } from '../../store/executionStore';
+
+function looksLikeHtml(output: string): boolean {
+  const trimmed = output.trimStart().toLowerCase();
+  return trimmed.startsWith('<!doctype') || trimmed.startsWith('<html');
+}
+
+function PythonPreview() {
+  const pythonOutput = useExecutionStore((s) => s.pythonOutput);
+  const pythonOutputReady = useExecutionStore((s) => s.pythonOutputReady);
+  const isRunning = useExecutionStore((s) => s.isRunning);
+
+  const hasOutput = pythonOutput.length > 0;
+
+  if (isRunning && !hasOutput) {
+    return (
+      <div className="flex items-center justify-center h-full gap-2">
+        <Loader2 size={16} className="animate-spin text-[var(--accent)]" />
+        <p className="text-sm text-[var(--text-muted)] select-none">Running...</p>
+      </div>
+    );
+  }
+
+  if (!hasOutput) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-2">
+        <Play size={20} className="text-[var(--text-muted)]" />
+        <p className="text-sm text-[var(--text-muted)] select-none">
+          Run to see preview
+        </p>
+      </div>
+    );
+  }
+
+  if (pythonOutputReady && looksLikeHtml(pythonOutput)) {
+    return (
+      <iframe
+        srcDoc={pythonOutput}
+        sandbox="allow-scripts"
+        title="Python HTML Output"
+        className="w-full h-full border-0 bg-white"
+      />
+    );
+  }
+
+  return (
+    <pre className="w-full h-full overflow-auto p-4 text-xs font-mono text-[var(--text-secondary)] bg-[var(--bg-primary)] whitespace-pre-wrap break-words">
+      {pythonOutput}
+      {isRunning && (
+        <span className="inline-block ml-1 w-1.5 h-3.5 bg-[var(--accent)] animate-pulse" />
+      )}
+    </pre>
+  );
+}
 
 export default function PreviewPane() {
   const previewContent = useExecutionStore((s) => s.previewContent);
   const previewType = useExecutionStore((s) => s.previewType);
   const requestRefresh = useExecutionStore((s) => s.requestRefresh);
 
-  const hasContent = previewType !== 'none' && previewContent.length > 0;
+  const hasContent = previewType !== 'none' && previewType !== 'python' && previewContent.length > 0;
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-primary)] overflow-hidden">
@@ -32,7 +85,9 @@ export default function PreviewPane() {
 
       {/* Preview Content */}
       <div className="flex-1 min-h-0">
-        {hasContent ? (
+        {previewType === 'python' ? (
+          <PythonPreview />
+        ) : hasContent ? (
           previewType === 'html' ? (
             <iframe
               srcDoc={previewContent}

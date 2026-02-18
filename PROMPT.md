@@ -97,3 +97,7 @@ Tests written:
 ---
 
 Implement the plan to add 3 new workspace example projects: python-hello-world, js-advanced, python-viz
+
+---
+
+Implement the plan to add Python file preview support: show Python execution output in the preview pane with auto-detection to render HTML output in an iframe when the script produces HTML.

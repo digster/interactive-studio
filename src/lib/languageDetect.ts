@@ -40,7 +40,7 @@ export function detectLanguage(filename: string): string {
   return extensionMap[ext] ?? 'plaintext';
 }
 
-export function getPreviewType(language: string): 'html' | 'markdown' | 'mermaid' | 'svg' | 'json' | 'none' {
+export function getPreviewType(language: string): 'html' | 'markdown' | 'mermaid' | 'svg' | 'json' | 'python' | 'none' {
   switch (language) {
     case 'html':
       return 'html';
@@ -52,6 +52,8 @@ export function getPreviewType(language: string): 'html' | 'markdown' | 'mermaid
       return 'svg';
     case 'json':
       return 'json';
+    case 'python':
+      return 'python';
     case 'javascript':
     case 'typescript':
     case 'jsx':
