@@ -1,12 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import * as tauriFS from '../lib/tauriFS';
-
-const DEV_FALLBACK_WORKSPACE = '/Users/ishan/lab/interactive-studio/workspace';
-
-function isTauri(): boolean {
-  return typeof window !== 'undefined' && '__TAURI__' in window;
-}
+import { isTauriRuntime } from '../lib/runtime';
+import { DEV_FALLBACK_WORKSPACE_PATH, resolveWorkspacePath } from '../lib/workspacePath';
 
 function mapFileEntries(entries: tauriFS.FileEntry[]): {
   name: string;
@@ -45,18 +41,25 @@ export function useWorkspace() {
       let wsPath = workspacePath;
 
       if (!wsPath) {
-        if (isTauri()) {
+        const isTauri = isTauriRuntime();
+        let home: string | null = null;
+
+        if (isTauri && !import.meta.env.DEV) {
           try {
             const { homeDir } = await import('@tauri-apps/api/path');
-            const home = await homeDir();
-            wsPath = `${home}interactive-studio/workspace`;
+            home = await homeDir();
           } catch (err) {
-            console.warn('Failed to resolve Tauri home directory, using fallback:', err);
-            wsPath = DEV_FALLBACK_WORKSPACE;
+            console.warn('Failed to resolve Tauri home directory, using fallback workspace:', err);
           }
-        } else {
-          wsPath = DEV_FALLBACK_WORKSPACE;
         }
+
+        wsPath = resolveWorkspacePath({
+          isTauri,
+          isDev: import.meta.env.DEV,
+          homeDir: home,
+          devWorkspacePath: DEV_FALLBACK_WORKSPACE_PATH,
+        });
+
         setWorkspacePath(wsPath);
       }
 
@@ -119,7 +122,7 @@ export function useWorkspace() {
 
   // Listen for fs-change events from Tauri and refresh tree
   useEffect(() => {
-    if (!isTauri() || !activeProject) return;
+    if (!isTauriRuntime() || !activeProject) return;
 
     let unlisten: (() => void) | null = null;
 

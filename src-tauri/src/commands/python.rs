@@ -107,7 +107,32 @@ pub async fn run_python(
 
     tokio::spawn(async move {
         let result = if has_uv {
-            run_with_uv(&app, &project, &script)
+            match run_with_uv(&app, &project, &script) {
+                Ok(()) => Ok(()),
+                Err(uv_err) => {
+                    let _ = app.emit(
+                        "python-output",
+                        PythonOutput {
+                            stream: "stderr".to_string(),
+                            data: format!(
+                                "uv execution failed ({}). Falling back to system Python...\n",
+                                uv_err
+                            ),
+                        },
+                    );
+
+                    if command_exists("python3") {
+                        run_with_python(&app, &project, &script, "python3")
+                    } else if command_exists("python") {
+                        run_with_python(&app, &project, &script, "python")
+                    } else {
+                        Err(format!(
+                            "uv failed and no system Python was found. Original error: {}",
+                            uv_err
+                        ))
+                    }
+                }
+            }
         } else if command_exists("python3") {
             run_with_python(&app, &project, &script, "python3")
         } else if command_exists("python") {

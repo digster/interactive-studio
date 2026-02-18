@@ -101,3 +101,27 @@ Implement the plan to add 3 new workspace example projects: python-hello-world, 
 ---
 
 Implement the plan to add Python file preview support: show Python execution output in the preview pane with auto-detection to render HTML output in an iframe when the script produces HTML.
+
+---
+
+Follow-up fixes after 2026-02-18 feature batch:
+
+1. **Tauri Runtime Detection Hardening** — Added `src/lib/runtime.ts` with `isTauriRuntime()` and updated hooks to use it:
+- `src/hooks/useCodeExecution.ts` (Python event listener setup now gated by Tauri runtime detection)
+- `src/hooks/useWorkspace.ts` (shared runtime detection for Tauri-specific behavior)
+
+2. **Workspace Path Resolution in Tauri Dev vs Production** — Added `src/lib/workspacePath.ts` with `resolveWorkspacePath()` and updated `useWorkspace` initialization:
+- Dev/browser/Tauri dev (`import.meta.env.DEV`) uses repo workspace: `/Users/ishan/lab/interactive-studio/workspace`
+- Production Tauri uses `$HOME/interactive-studio/workspace`
+- Falls back to repo workspace if `homeDir()` resolution fails
+
+3. **Python Execution Fallback Hardening** — Updated `src-tauri/src/commands/python.rs`:
+- If `uv` is installed but execution fails, backend now emits stderr context and falls back to `python3`/`python` instead of failing immediately
+
+4. **Tests Added**
+- `tests/unit/lib/runtime.test.ts` (runtime detection matrix)
+- `tests/unit/lib/workspacePath.test.ts` (workspace path resolution matrix)
+
+5. **Documentation Sync**
+- Updated `ARCHITECTURE.md` for runtime detection, workspace resolution behavior, and uv failure fallback
+- Appended update section in `memory/2026-02-18.md`

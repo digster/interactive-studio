@@ -38,7 +38,7 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 ### Command Modules (src/commands/)
 - **filesystem.rs** - Low-level file CRUD: read_file, write_file, create_file, create_dir, delete_path, rename_path, list_dir. Defines the shared `FileEntry` struct used across modules.
 - **workspace.rs** - Project-level operations: list_projects, create_project (with template scaffolding: blank/html/python/markdown), get_project_tree (recursive tree with noise filtering).
-- **python.rs** - Python execution: prefers `uv` (creates .venv automatically), falls back to `python3`/`python`. Streams output via Tauri events (`python-output`, `python-exit`) using `tokio::spawn`.
+- **python.rs** - Python execution: prefers `uv` (creates .venv automatically), falls back to `python3`/`python`, and if `uv` fails at runtime it emits a stderr note then retries with system Python. Streams output via Tauri events (`python-output`, `python-exit`) using `tokio::spawn`.
 - **shell.rs** - Generic command execution: execute_command with configurable args and working directory.
 
 ### Watchers (src/watchers/)
@@ -99,9 +99,9 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 ### Hooks (src/hooks/)
 - **useAutoSave.ts** - Debounced auto-save triggered by editor content changes
 - **usePreview.ts** - Watches editor tabs + active project + refresh key. Debounces 300ms, builds HTML preview (inlines CSS/JS assets) or sets raw content for other preview types.
-- **useCodeExecution.ts** - Manages Python execution lifecycle. Saves file, clears console/problems, listens for `python-output`/`python-exit` Tauri events. Parses Python tracebacks for file/line info. For web languages, triggers preview refresh instead.
+- **useCodeExecution.ts** - Manages Python execution lifecycle. Saves file, clears console/problems, and (when `isTauriRuntime()` is true) listens for `python-output`/`python-exit` Tauri events. Parses Python tracebacks for file/line info. For web languages, triggers preview refresh instead.
 - **useKeyboardShortcuts.ts** - Global keyboard shortcut handling (Cmd+B sidebar, Cmd+J bottom panel, Cmd+\ preview)
-- **useWorkspace.ts** - Initializes workspace on mount: resolves path, lists projects, auto-selects first, loads file tree, starts file watcher, listens for `fs-change` events
+- **useWorkspace.ts** - Initializes workspace on mount: resolves path, lists projects, auto-selects first, loads file tree, starts file watcher, listens for `fs-change` events. Workspace resolution is environment-aware: repo workspace in dev (`pnpm tauri dev` / browser), home workspace in production Tauri.
 - **useFileOperations.ts** - File CRUD callbacks: saveFile, createNewFile, createNewFolder, deleteFile, renameFile. Refreshes file tree after mutations.
 - **useTheme.ts** - Theme detection and application
 - **useDebounce.ts** - Generic debounce utility hook
@@ -111,6 +111,8 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 - **previewBuilder.ts** - Builds self-contained HTML for iframe preview by inlining `<link>` and `<script src>` assets. Reads content from open editor tabs (unsaved edits) first, falls back to disk via `invoke('read_file')`. Skips external URLs.
 - **languageDetect.ts** - File extension to language mapping, preview type detection, executable language check
 - **fileIcons.ts** - File extension to icon mapping
+- **runtime.ts** - Runtime detection helpers (`isTauriRuntime`) compatible with both Tauri v2 (`globalThis.isTauri` / `__TAURI_INTERNALS__`) and legacy globals.
+- **workspacePath.ts** - Centralized workspace path resolver (`resolveWorkspacePath`) for dev vs production Tauri behavior.
 
 ## Key Data Flows
 
@@ -130,14 +132,17 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 
 ### Python Execution
 1. User clicks run -> `invoke("run_python")` with project path and script name
-2. Backend checks for uv, creates venv if needed, spawns process
-3. stdout/stderr streamed via `python-output` events -> `executionStore` appends console entries + `pythonOutput` (stdout only)
-4. stderr parsed for traceback file/line info -> added as problems
-5. Process completion emits `python-exit` with exit code, sets `pythonOutputReady`
-6. Preview pane renders accumulated `pythonOutput` — auto-detects HTML for iframe rendering
+2. Backend prefers `uv`, creates venv if needed, and executes the script
+3. If `uv` execution fails, backend emits stderr context and retries with `python3`/`python` when available
+4. stdout/stderr streamed via `python-output` events -> `executionStore` appends console entries + `pythonOutput` (stdout only)
+5. stderr parsed for traceback file/line info -> added as problems
+6. Process completion emits `python-exit` with exit code, sets `pythonOutputReady`
+7. Preview pane renders accumulated `pythonOutput` — auto-detects HTML for iframe rendering
 
 ### Project Management
-1. Workspace path set in workspaceStore
+1. Workspace path is resolved and stored:
+   - Dev/browser/Tauri dev -> repo workspace (`/Users/ishan/lab/interactive-studio/workspace`)
+   - Production Tauri -> `$HOME/interactive-studio/workspace`
 2. `invoke("list_projects")` scans workspace directory for project folders
 3. `invoke("create_project")` scaffolds from template (Rust-side: blank/html/python/markdown)
 4. Client-side templates (React/Mermaid) write extra files after blank project creation

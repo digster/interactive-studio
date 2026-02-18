@@ -5,10 +5,7 @@ import { useWorkspaceStore } from '../store/workspaceStore';
 import { useUIStore } from '../store/uiStore';
 import * as tauriFS from '../lib/tauriFS';
 import { getPreviewType } from '../lib/languageDetect';
-
-function isTauri(): boolean {
-  return typeof window !== 'undefined' && '__TAURI__' in window;
-}
+import { isTauriRuntime } from '../lib/runtime';
 
 const TRACEBACK_RE = /File "(.+)", line (\d+)/;
 
@@ -23,7 +20,7 @@ export function useCodeExecution() {
 
   // Set up Tauri event listeners for Python output/exit
   useEffect(() => {
-    if (!isTauri()) return;
+    if (!isTauriRuntime()) return;
 
     async function setupListeners() {
       const { listen } = await import('@tauri-apps/api/event');
