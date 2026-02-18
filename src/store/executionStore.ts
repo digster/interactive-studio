@@ -11,12 +11,25 @@ export interface ConsoleEntry {
 
 export type PreviewType = 'html' | 'markdown' | 'mermaid' | 'svg' | 'json' | 'none';
 
+export type ProblemSeverity = 'error' | 'warning';
+
+export interface Problem {
+  id: string;
+  severity: ProblemSeverity;
+  message: string;
+  filePath?: string;
+  line?: number;
+  column?: number;
+}
+
 export interface ExecutionState {
   isRunning: boolean;
   consoleEntries: ConsoleEntry[];
   previewContent: string;
   previewType: PreviewType;
+  previewRefreshKey: number;
   lastError: string | null;
+  problems: Problem[];
 
   setRunning: (running: boolean) => void;
   addConsoleEntry: (type: ConsoleEntryType, content: string) => void;
@@ -24,6 +37,9 @@ export interface ExecutionState {
   setPreview: (content: string, type: PreviewType) => void;
   clearPreview: () => void;
   setError: (error: string | null) => void;
+  requestRefresh: () => void;
+  addProblem: (severity: ProblemSeverity, message: string, filePath?: string, line?: number, column?: number) => void;
+  clearProblems: () => void;
 }
 
 export const useExecutionStore = create<ExecutionState>()((set) => ({
@@ -31,7 +47,9 @@ export const useExecutionStore = create<ExecutionState>()((set) => ({
   consoleEntries: [],
   previewContent: '',
   previewType: 'none',
+  previewRefreshKey: 0,
   lastError: null,
+  problems: [],
 
   setRunning: (running) => set({ isRunning: running }),
 
@@ -55,5 +73,39 @@ export const useExecutionStore = create<ExecutionState>()((set) => ({
 
   clearPreview: () => set({ previewContent: '', previewType: 'none' }),
 
-  setError: (error) => set({ lastError: error }),
+  setError: (error) =>
+    set((state) => {
+      if (!error) return { lastError: null };
+      return {
+        lastError: error,
+        problems: [
+          ...state.problems,
+          {
+            id: crypto.randomUUID(),
+            severity: 'error',
+            message: error,
+          },
+        ],
+      };
+    }),
+
+  requestRefresh: () =>
+    set((state) => ({ previewRefreshKey: state.previewRefreshKey + 1 })),
+
+  addProblem: (severity, message, filePath, line, column) =>
+    set((state) => ({
+      problems: [
+        ...state.problems,
+        {
+          id: crypto.randomUUID(),
+          severity,
+          message,
+          filePath,
+          line,
+          column,
+        },
+      ],
+    })),
+
+  clearProblems: () => set({ problems: [] }),
 }));

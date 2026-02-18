@@ -1,6 +1,9 @@
-import { Trash2 } from 'lucide-react';
-import { useExecutionStore, type ConsoleEntry } from '../../store/executionStore';
+import { AlertCircle, AlertTriangle, Trash2 } from 'lucide-react';
+import { useExecutionStore, type ConsoleEntry, type Problem } from '../../store/executionStore';
+import { useEditorStore } from '../../store/editorStore';
 import { useUIStore } from '../../store/uiStore';
+import { readFile } from '../../lib/tauriFS';
+import { detectLanguage } from '../../lib/languageDetect';
 import clsx from 'clsx';
 
 function entryColor(type: ConsoleEntry['type']): string {
@@ -35,11 +38,61 @@ function entryPrefix(type: ConsoleEntry['type']): string {
   }
 }
 
+function ProblemRow({ problem }: { problem: Problem }) {
+  const handleClick = async () => {
+    if (!problem.filePath) return;
+    try {
+      const content = await readFile(problem.filePath);
+      const name = problem.filePath.split('/').pop() ?? problem.filePath;
+      const language = detectLanguage(name);
+      useEditorStore.getState().openFile(problem.filePath, name, content, language);
+    } catch {
+      // File may not exist
+    }
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      className={clsx(
+        'w-full flex items-start gap-2 px-3 py-1.5 text-xs text-left rounded hover:bg-[var(--surface-hover)] transition-colors duration-100',
+        problem.severity === 'error' ? 'text-[var(--error)]' : 'text-[var(--warning)]',
+      )}
+    >
+      {problem.severity === 'error' ? (
+        <AlertCircle size={14} className="shrink-0 mt-0.5" />
+      ) : (
+        <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+      )}
+      <div className="min-w-0 flex-1">
+        <span className="whitespace-pre-wrap break-all">{problem.message}</span>
+        {problem.filePath && (
+          <span className="ml-2 text-[var(--text-muted)] text-[11px]">
+            {problem.filePath.split('/').pop()}
+            {problem.line != null && `:${problem.line}`}
+            {problem.column != null && `:${problem.column}`}
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}
+
 export default function ConsolePanel() {
   const consoleEntries = useExecutionStore((s) => s.consoleEntries);
   const clearConsole = useExecutionStore((s) => s.clearConsole);
+  const problems = useExecutionStore((s) => s.problems);
+  const clearProblems = useExecutionStore((s) => s.clearProblems);
   const activeTab = useUIStore((s) => s.bottomPanelActiveTab);
   const setActiveTab = useUIStore((s) => s.setBottomPanelActiveTab);
+
+  const handleClear = () => {
+    if (activeTab === 'console') {
+      clearConsole();
+    } else {
+      clearProblems();
+    }
+  };
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-primary)] overflow-hidden">
@@ -67,13 +120,18 @@ export default function ConsolePanel() {
             )}
           >
             Problems
+            {problems.length > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 text-[10px] rounded-full bg-[var(--error)]/15 text-[var(--error)] font-semibold">
+                {problems.length}
+              </span>
+            )}
           </button>
         </div>
 
         <button
-          onClick={clearConsole}
+          onClick={handleClear}
           className="p-1 rounded hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors duration-150"
-          aria-label="Clear console"
+          aria-label={activeTab === 'console' ? 'Clear console' : 'Clear problems'}
         >
           <Trash2 size={14} />
         </button>
@@ -106,6 +164,12 @@ export default function ConsolePanel() {
               </p>
             </div>
           )
+        ) : problems.length > 0 ? (
+          <div className="p-1 space-y-0.5">
+            {problems.map((problem) => (
+              <ProblemRow key={problem.id} problem={problem} />
+            ))}
+          </div>
         ) : (
           <div className="flex items-center justify-center h-full">
             <p className="text-xs text-[var(--text-muted)] select-none">

@@ -55,7 +55,7 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 ### State Management (src/store/) - Zustand 5
 - **workspaceStore.ts** - Projects, file tree, active project, expanded directories (Set<string>)
 - **editorStore.ts** - Open tabs, active tab, content editing, cursor position, tab reordering
-- **executionStore.ts** - Running state, console entries (with UUID IDs), preview content/type
+- **executionStore.ts** - Running state, console entries (with UUID IDs), preview content/type, preview refresh key, problems list with severity/file/line tracking
 - **settingsStore.ts** - Theme, font size, tab size, auto-save, word wrap, minimap
 - **uiStore.ts** - Sidebar/bottom panel/preview visibility and dimensions
 
@@ -64,29 +64,42 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 
 ### Layout Components (src/components/layout/)
 - **AppShell.tsx** - Root layout using `react-resizable-panels`. Vertical stack: TopBar + horizontal PanelGroup (Sidebar | Center | Preview) + StatusBar. Center panel contains vertical PanelGroup: EditorPane + ConsolePanel. Panel visibility controlled by uiStore.
-- **TopBar.tsx** - 48px header. Left: sidebar toggle (hamburger) + app title. Center: project selector dropdown. Right: theme cycle button (light->dark->system) + settings. Has `data-tauri-drag-region` for macOS window dragging.
+- **TopBar.tsx** - 48px header. Left: sidebar toggle + app title. Center: project selector dropdown with "New Project..." option. Right: theme cycle button + settings button (opens SettingsPanel modal).
 - **StatusBar.tsx** - 24px footer. Shows active file language, cursor position (Ln/Col), encoding (UTF-8).
-- **Sidebar.tsx** - Left panel with "EXPLORER" header, active project name with folder icon, renders FileTree component. Shows "No project open" when empty.
+- **Sidebar.tsx** - Left panel with "EXPLORER" header, New File/Folder buttons, active project name with folder icon, renders FileTree component.
 
 ### FileTree Components (src/components/filetree/)
 - **FileTree.tsx** - Container that maps `workspaceStore.fileTree` to `FileTreeNode` at depth=0. Shows "No files found" empty state. `role="tree"`.
-- **FileTreeNode.tsx** - Recursive component for single file/folder node. Directories show expand/collapse chevron with CSS grid animation (`grid-template-rows: 0fr → 1fr`). Files display language-colored icons. Children sorted: directories first (alpha), then files (alpha). Clicking a file reads content via `tauriFS.readFile()`, detects language, and opens in editor. Active file gets subtle accent highlight.
+- **FileTreeNode.tsx** - Recursive component for single file/folder node. Directories show expand/collapse chevron with CSS grid animation. Right-click context menu for Rename/Delete (files) or New File/New Folder/Rename/Delete (folders). Inline input for rename and new file/folder creation. Delete confirmation dialog for destructive operations.
 
 ### Editor Components (src/components/editor/)
-- **EditorPane.tsx** - TabBar + CodeEditor (keyed by `activeTab.id` for destroy/recreate on tab switch). Shows placeholder when no file is open.
-- **TabBar.tsx** - Horizontal scrollable tabs with file icons, modified dot indicator, close buttons (visible on hover). Active tab has accent bottom border.
-- **CodeEditor.tsx** - CodeMirror 6 React wrapper using ref-based imperative approach. `EditorView` lifecycle managed by `useEffect` keyed on `tabId`. Uses `Compartment` refs for dynamic reconfiguration of theme, language, tabSize, wordWrap, and fontSize. `EditorView.updateListener` wires doc changes to `editorStore.updateContent()` and cursor changes to `updateCursorPosition()`. Extensions: lineNumbers, highlightActiveLine, foldGutter, bracketMatching, closeBrackets, autocompletion, search, history.
-- **cmLanguages.ts** - Maps app language strings to CodeMirror language extensions. Supports: javascript, typescript, jsx, tsx, html, css, python, json, markdown. Returns `null` for unsupported languages.
-- **cmTheme.ts** - `createLightTheme()` uses CSS variables for colors. `createDarkTheme()` uses `oneDark` base with gutter overrides matching the app shell.
+- **EditorPane.tsx** - TabBar + run toolbar (visible for executable files) + CodeEditor. Run toolbar has Play/Stop button and shows ⌘+Enter shortcut hint.
+- **TabBar.tsx** - Horizontal scrollable tabs with file icons, modified dot indicator, close buttons.
+- **CodeEditor.tsx** - CodeMirror 6 React wrapper using Compartment-based dynamic reconfiguration for theme, language, tabSize, wordWrap, and fontSize.
+- **cmLanguages.ts** - Maps language strings to CodeMirror language extensions.
+- **cmTheme.ts** - Light/dark theme creation for CodeMirror.
 
 ### Preview Components (src/components/preview/)
-- **PreviewPane.tsx** - Header with "Preview" label, preview type indicator, refresh button. Content area placeholder.
+- **PreviewPane.tsx** - Live HTML rendering via `<iframe srcdoc>` with `sandbox="allow-scripts"`. Supports HTML (with inlined CSS/JS assets), SVG (rendered), markdown/json/mermaid (raw). Refresh button triggers `requestRefresh()`. Shows placeholder when no previewable file is active.
 
 ### Console Components (src/components/console/)
-- **ConsolePanel.tsx** - Bottom panel with Console/Problems tab switcher. Console entries color-coded by type (log/warn/error/info/result) with prefix badges. Clear button. Monospace font.
+- **ConsolePanel.tsx** - Bottom panel with Console/Problems tab switcher. Console entries color-coded by type. Problems tab shows severity icons (error/warning), message, file path + line number. Clicking a problem opens the file. Badge count on Problems tab label. Clear button scoped to active tab.
+
+### Settings Components (src/components/settings/)
+- **SettingsPanel.tsx** - Modal dialog with all editor settings. Theme (segmented control), Font Size (+/- buttons), Tab Size (segmented control), Word Wrap (toggle), Minimap (toggle), Auto Save (toggle + delay input). Changes apply immediately via Zustand store setters.
+
+### Project Components (src/components/project/)
+- **NewProjectDialog.tsx** - Modal dialog for project creation. Name input with validation (alphanumeric/hyphens/underscores, no duplicates). 2-column template grid (Blank, HTML, Python, Markdown, React, Mermaid). React/Mermaid use client-side template files written after blank project creation.
+
+### Reusable UI Components (src/components/ui/)
+- **ContextMenu.tsx** - Generic positioned dropdown via React portal. Supports icons, danger styling, separators. Closes on outside click/Escape. Boundary detection nudges menu if it would overflow viewport.
+- **ConfirmDialog.tsx** - Delete confirmation modal with backdrop blur. Title + message + Cancel/Delete buttons.
+- **InlineInput.tsx** - Auto-focused inline text input for rename/create operations. Pre-selects filename (without extension). Commits on Enter, cancels on Escape/blur.
 
 ### Hooks (src/hooks/)
 - **useAutoSave.ts** - Debounced auto-save triggered by editor content changes
+- **usePreview.ts** - Watches editor tabs + active project + refresh key. Debounces 300ms, builds HTML preview (inlines CSS/JS assets) or sets raw content for other preview types.
+- **useCodeExecution.ts** - Manages Python execution lifecycle. Saves file, clears console/problems, listens for `python-output`/`python-exit` Tauri events. Parses Python tracebacks for file/line info. For web languages, triggers preview refresh instead.
 - **useKeyboardShortcuts.ts** - Global keyboard shortcut handling (Cmd+B sidebar, Cmd+J bottom panel, Cmd+\ preview)
 - **useWorkspace.ts** - Initializes workspace on mount: resolves path, lists projects, auto-selects first, loads file tree, starts file watcher, listens for `fs-change` events
 - **useFileOperations.ts** - File CRUD callbacks: saveFile, createNewFile, createNewFolder, deleteFile, renameFile. Refreshes file tree after mutations.
@@ -95,9 +108,9 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 
 ### Utilities (src/lib/)
 - **tauriFS.ts** - Tauri IPC wrappers for filesystem commands
-- **languageDetect.ts** - File extension to language mapping
+- **previewBuilder.ts** - Builds self-contained HTML for iframe preview by inlining `<link>` and `<script src>` assets. Reads content from open editor tabs (unsaved edits) first, falls back to disk via `invoke('read_file')`. Skips external URLs.
+- **languageDetect.ts** - File extension to language mapping, preview type detection, executable language check
 - **fileIcons.ts** - File extension to icon mapping
-- **templates.ts** - Project template definitions
 
 ## Key Data Flows
 
@@ -108,17 +121,26 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 4. Auto-save hook debounces and calls `invoke("write_file")`
 5. File watcher detects change, emits `fs-change` event (filtered to avoid echo)
 
+### Live Preview
+1. `usePreview` hook watches editor state (tabs, activeTabId, previewRefreshKey)
+2. On change, debounces 300ms then calls `buildHtmlPreview()`
+3. Preview builder reads active HTML tab content, inlines CSS/JS from open tabs or disk
+4. Resulting HTML set as iframe `srcdoc` with `sandbox="allow-scripts"`
+5. Refresh button triggers `requestRefresh()` which increments previewRefreshKey
+
 ### Python Execution
 1. User clicks run -> `invoke("run_python")` with project path and script name
 2. Backend checks for uv, creates venv if needed, spawns process
 3. stdout/stderr streamed via `python-output` events -> `executionStore` appends console entries
-4. Process completion emits `python-exit` with exit code
+4. stderr parsed for traceback file/line info -> added as problems
+5. Process completion emits `python-exit` with exit code
 
 ### Project Management
 1. Workspace path set in workspaceStore
 2. `invoke("list_projects")` scans workspace directory for project folders
-3. `invoke("create_project")` scaffolds from template
-4. `invoke("get_project_tree")` returns recursive FileEntry tree
+3. `invoke("create_project")` scaffolds from template (Rust-side: blank/html/python/markdown)
+4. Client-side templates (React/Mermaid) write extra files after blank project creation
+5. `invoke("get_project_tree")` returns recursive FileEntry tree
 
 ## Build & Dev
 
@@ -131,6 +153,12 @@ pnpm tauri dev
 
 # Build for production
 pnpm tauri build
+
+# Run tests
+pnpm test
+
+# Run tests in watch mode
+pnpm test:watch
 ```
 
 ## Configuration

@@ -66,3 +66,30 @@ Step 2 - CodeMirror 6 Editor (Phase 3):
 - `src/components/editor/cmTheme.ts` - Light/dark CM themes using CSS variables
 - `src/components/editor/CodeEditor.tsx` - CM6 wrapper with Compartment-based dynamic reconfiguration
 - Modified `src/components/editor/EditorPane.tsx` - Replace `<pre>` with CodeEditor
+
+---
+
+## 2026-02-18
+
+Implement all 6 missing features for Interactive Studio:
+
+1. **Preview Pane** — Live HTML rendering via iframe srcdoc with inlined CSS/JS assets. Created previewBuilder.ts, usePreview.ts hook, updated PreviewPane.tsx with iframe rendering.
+2. **Problems Tab** — Added Problem interface/state to executionStore, updated ConsolePanel with problem list, badge count, split clear button, clickable file paths.
+3. **Run Button & Code Execution** — Created useCodeExecution hook with Tauri event listeners for python-output/python-exit. Added run toolbar to EditorPane with Play button and Cmd+Enter shortcut.
+4. **File CRUD UI** — Created ContextMenu, ConfirmDialog, InlineInput components. Wired context menu into FileTreeNode (Rename/Delete for files, New File/Folder/Rename/Delete for folders). Added new file/folder buttons to Sidebar header.
+5. **Settings Panel** — Created SettingsPanel modal with Theme, Font Size, Tab Size, Word Wrap, Minimap, Auto Save controls. Wired to TopBar settings button.
+6. **Project Creation** — Created NewProjectDialog with name validation + template grid (Blank, HTML, Python, Markdown, React, Mermaid). Added "New Project..." to TopBar dropdown.
+
+---
+
+Write unit tests for new features added to the Interactive Studio project. The project uses vitest with jsdom environment, @testing-library/react for component tests, @testing-library/jest-dom for assertions, and Zustand stores tested via setState. Test files go in tests/unit/ mirroring the src/ structure.
+
+Tests written:
+1. `tests/unit/store/executionStore.test.ts` - Tests for previewRefreshKey, problems[], requestRefresh(), addProblem(), clearProblems(), setError() pushing to problems, and all existing console/preview state
+2. `tests/unit/lib/previewBuilder.test.ts` - Tests for buildHtmlPreview: empty when no active tab, HTML content with timestamp, skipping external URLs, using tab content for linked CSS/JS, readFile fallback, finding index.html from CSS tab
+3. `tests/unit/components/ui/ContextMenu.test.tsx` - Tests for rendering menu items, onClick/onClose callbacks, Escape key closing, separator rendering
+4. `tests/unit/components/ui/ConfirmDialog.test.tsx` - Tests for title/message rendering, onConfirm/onCancel callbacks, Escape key, custom confirm label
+5. `tests/unit/components/ui/InlineInput.test.tsx` - Tests for default value, Enter submit with trimming, Escape cancel, blur behavior, placeholder
+6. `tests/unit/components/settings/SettingsPanel.test.tsx` - Tests for setting labels, close button, Escape, font size buttons with bounds, theme segmented control, toggle switches (wordWrap, minimap, autoSave), tab size control
+7. `tests/unit/components/project/NewProjectDialog.test.tsx` - Tests for dialog title, template rendering, validation errors (empty name, invalid chars, duplicate), template selection, close/cancel buttons, Escape, error clearing, button disabled state
+8. Updated `tests/unit/components/console/ConsolePanel.test.tsx` - Added tests for problem count badge, problems list rendering, clear problems button, severity icons/messages, file path info display
