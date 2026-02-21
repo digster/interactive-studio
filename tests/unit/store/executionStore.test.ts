@@ -8,11 +8,13 @@ describe('executionStore', () => {
       consoleEntries: [],
       previewContent: '',
       previewType: 'none',
+      previewUrl: null,
       previewRefreshKey: 0,
       lastError: null,
       problems: [],
       pythonOutput: '',
       pythonOutputReady: false,
+      runningMode: null,
     });
   });
 
@@ -129,6 +131,15 @@ describe('executionStore', () => {
     const state = useExecutionStore.getState();
     expect(state.previewContent).toBe('<h1>Hi</h1>');
     expect(state.previewType).toBe('html');
+    expect(state.previewUrl).toBeNull();
+  });
+
+  it('should set preview URL and switch previewType to url', () => {
+    useExecutionStore.getState().setPreviewUrl('http://127.0.0.1:8050/');
+    const state = useExecutionStore.getState();
+    expect(state.previewUrl).toBe('http://127.0.0.1:8050/');
+    expect(state.previewType).toBe('url');
+    expect(state.previewContent).toBe('');
   });
 
   it('should clear preview', () => {
@@ -137,6 +148,7 @@ describe('executionStore', () => {
     const state = useExecutionStore.getState();
     expect(state.previewContent).toBe('');
     expect(state.previewType).toBe('none');
+    expect(state.previewUrl).toBeNull();
   });
 
   // --- Python output ---
@@ -168,5 +180,14 @@ describe('executionStore', () => {
 
     useExecutionStore.getState().setPythonOutputReady(false);
     expect(useExecutionStore.getState().pythonOutputReady).toBe(false);
+  });
+
+  it('should set runningMode via setRunningMode', () => {
+    useExecutionStore.getState().setRunningMode('app');
+    expect(useExecutionStore.getState().runningMode).toBe('app');
+    useExecutionStore.getState().setRunningMode('script');
+    expect(useExecutionStore.getState().runningMode).toBe('script');
+    useExecutionStore.getState().setRunningMode(null);
+    expect(useExecutionStore.getState().runningMode).toBeNull();
   });
 });

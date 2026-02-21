@@ -1,0 +1,8 @@
+[project]
+name = "interactive-studio-dash-example"
+version = "0.1.0"
+description = "Dash example app for Interactive Studio"
+requires-python = ">=3.10"
+dependencies = [
+  "dash>=2.18.0,<3.0.0",
+]

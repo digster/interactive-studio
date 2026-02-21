@@ -125,3 +125,11 @@ Follow-up fixes after 2026-02-18 feature batch:
 5. **Documentation Sync**
 - Updated `ARCHITECTURE.md` for runtime detection, workspace resolution behavior, and uv failure fallback
 - Appended update section in `memory/2026-02-18.md`
+
+---
+
+## 2026-02-21
+
+Can we use dash by plotly in our app? if yes, add an example in the workspace folder.
+
+Implement the plan.

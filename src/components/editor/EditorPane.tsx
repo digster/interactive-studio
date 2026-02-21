@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { FileText, Play, Loader2 } from 'lucide-react';
+import { FileText, Play, Loader2, Square } from 'lucide-react';
 import { useEditorStore } from '../../store/editorStore';
 import { useExecutionStore } from '../../store/executionStore';
 import { isExecutable } from '../../lib/languageDetect';
@@ -11,8 +11,9 @@ export default function EditorPane() {
   const tabs = useEditorStore((s) => s.tabs);
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const isRunning = useExecutionStore((s) => s.isRunning);
+  const runningMode = useExecutionStore((s) => s.runningMode);
   const activeTab = tabs.find((t) => t.id === activeTabId);
-  const { execute } = useCodeExecution();
+  const { execute, stop } = useCodeExecution();
 
   const showToolbar = activeTab && isExecutable(activeTab.language);
 
@@ -21,12 +22,16 @@ export default function EditorPane() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        execute();
+        if (isRunning && runningMode === 'app') {
+          stop();
+        } else {
+          execute();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [execute]);
+  }, [execute, isRunning, runningMode, stop]);
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-primary)] overflow-hidden">
@@ -49,6 +54,16 @@ export default function EditorPane() {
             )}
             <span>{isRunning ? 'Running...' : 'Run'}</span>
           </button>
+          {isRunning && runningMode === 'app' && (
+            <button
+              onClick={stop}
+              className="flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-md bg-[var(--error)]/15 text-[var(--error)] hover:bg-[var(--error)]/25 transition-colors duration-150"
+              aria-label="Stop app"
+            >
+              <Square size={12} className="fill-current" />
+              <span>Stop</span>
+            </button>
+          )}
           <span className="text-[11px] text-[var(--text-muted)]">
             {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}+Enter
           </span>

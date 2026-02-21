@@ -72,6 +72,19 @@ export async function runPython(
   return invoke('run_python', { projectPath, scriptName });
 }
 
+export async function runPythonApp(
+  projectPath: string,
+  scriptName: string,
+  host = '127.0.0.1',
+  port = 8050
+): Promise<void> {
+  return invoke('run_python_app', { projectPath, scriptName, host, port });
+}
+
+export async function stopPythonApp(): Promise<void> {
+  return invoke('stop_python_app');
+}
+
 export async function checkPythonEnv(projectPath: string): Promise<PythonEnvInfo> {
   return invoke<PythonEnvInfo>('check_python_env', { projectPath });
 }

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import EditorPane from '../../../../src/components/editor/EditorPane';
 import { useEditorStore } from '../../../../src/store/editorStore';
+import { useExecutionStore } from '../../../../src/store/executionStore';
 
 // Mock CodeEditor to avoid CodeMirror DOM issues in jsdom
 vi.mock('../../../../src/components/editor/CodeEditor', () => ({
@@ -15,6 +16,7 @@ vi.mock('../../../../src/components/editor/CodeEditor', () => ({
 describe('EditorPane', () => {
   beforeEach(() => {
     useEditorStore.setState({ tabs: [], activeTabId: null });
+    useExecutionStore.setState({ isRunning: false, runningMode: null });
   });
 
   it('should show empty state when no tabs are open', () => {
@@ -43,5 +45,27 @@ describe('EditorPane', () => {
     expect(editor).toBeInTheDocument();
     expect(editor).toHaveAttribute('data-language', 'python');
     expect(editor).toHaveTextContent('print("hello")');
+  });
+
+  it('should show Stop button when python app mode is running', () => {
+    useEditorStore.setState({
+      tabs: [
+        {
+          id: '/app.py',
+          name: 'app.py',
+          path: '/app.py',
+          language: 'python',
+          content: 'from dash import Dash',
+          savedContent: 'from dash import Dash',
+          isModified: false,
+          cursorPosition: { line: 1, col: 1 },
+        },
+      ],
+      activeTabId: '/app.py',
+    });
+    useExecutionStore.setState({ isRunning: true, runningMode: 'app' });
+
+    render(<EditorPane />);
+    expect(screen.getByLabelText('Stop app')).toBeInTheDocument();
   });
 });

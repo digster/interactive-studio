@@ -1,11 +1,16 @@
 mod commands;
 mod watchers;
 
+use commands::python::PythonProcessManager;
 use tauri::{AppHandle, State};
 use watchers::fs_watcher::FileWatcher;
 
 #[tauri::command]
-fn start_watching(app: AppHandle, watcher: State<'_, FileWatcher>, path: String) -> Result<(), String> {
+fn start_watching(
+    app: AppHandle,
+    watcher: State<'_, FileWatcher>,
+    path: String,
+) -> Result<(), String> {
     watcher.watch(app, &path)
 }
 
@@ -21,6 +26,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .manage(FileWatcher::new())
+        .manage(PythonProcessManager::default())
         .invoke_handler(tauri::generate_handler![
             // Filesystem commands
             commands::filesystem::read_file,
@@ -36,6 +42,8 @@ pub fn run() {
             commands::workspace::get_project_tree,
             // Python commands
             commands::python::run_python,
+            commands::python::run_python_app,
+            commands::python::stop_python_app,
             commands::python::check_python_env,
             // Shell commands
             commands::shell::execute_command,

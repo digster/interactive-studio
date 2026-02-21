@@ -38,7 +38,9 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 ### Command Modules (src/commands/)
 - **filesystem.rs** - Low-level file CRUD: read_file, write_file, create_file, create_dir, delete_path, rename_path, list_dir. Defines the shared `FileEntry` struct used across modules.
 - **workspace.rs** - Project-level operations: list_projects, create_project (with template scaffolding: blank/html/python/markdown), get_project_tree (recursive tree with noise filtering).
-- **python.rs** - Python execution: prefers `uv` (creates .venv automatically), falls back to `python3`/`python`, and if `uv` fails at runtime it emits a stderr note then retries with system Python. Streams output via Tauri events (`python-output`, `python-exit`) using `tokio::spawn`.
+- **python.rs** - Python execution has two modes:
+  - `run_python`: one-shot script execution (uv-first with fallback to system Python), emits `python-output` and `python-exit`.
+  - `run_python_app` / `stop_python_app`: managed long-running Python app process (used for Dash), emits `python-output`, `python-app-ready` (URL), and `python-exit`. Includes local port selection (starting from 8050) and readiness probing.
 - **shell.rs** - Generic command execution: execute_command with configurable args and working directory.
 
 ### Watchers (src/watchers/)
@@ -46,7 +48,7 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 
 ### Key Patterns
 - All commands use `#[tauri::command]` and return `Result<T, String>` with `map_err` for error handling
-- `FileWatcher` is stored as Tauri managed state via `.manage()`
+- `FileWatcher` and `PythonProcessManager` are both stored as Tauri managed state via `.manage()`
 - Python execution is async: `tokio::spawn` runs the process on a background task, events stream results back
 - FileEntry is the canonical type for file tree representation, reused by workspace module
 
@@ -55,7 +57,7 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 ### State Management (src/store/) - Zustand 5
 - **workspaceStore.ts** - Projects, file tree, active project, expanded directories (Set<string>)
 - **editorStore.ts** - Open tabs, active tab, content editing, cursor position, tab reordering
-- **executionStore.ts** - Running state, console entries (with UUID IDs), preview content/type, preview refresh key, problems list with severity/file/line tracking, Python output accumulator (separate from previewContent for async streaming)
+- **executionStore.ts** - Running state, running mode (`script`/`app`), console entries (with UUID IDs), preview content/type plus URL preview state, preview refresh key, problems list with severity/file/line tracking, Python output accumulator (separate from previewContent for async streaming)
 - **settingsStore.ts** - Theme, font size, tab size, auto-save, word wrap, minimap
 - **uiStore.ts** - Sidebar/bottom panel/preview visibility and dimensions
 
@@ -73,14 +75,14 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 - **FileTreeNode.tsx** - Recursive component for single file/folder node. Directories show expand/collapse chevron with CSS grid animation. Right-click context menu for Rename/Delete (files) or New File/New Folder/Rename/Delete (folders). Inline input for rename and new file/folder creation. Delete confirmation dialog for destructive operations.
 
 ### Editor Components (src/components/editor/)
-- **EditorPane.tsx** - TabBar + run toolbar (visible for executable files) + CodeEditor. Run toolbar has Play/Stop button and shows ⌘+Enter shortcut hint.
+- **EditorPane.tsx** - TabBar + run toolbar (visible for executable files) + CodeEditor. Run toolbar has Run, and when a Python app is active it shows a Stop button. ⌘+Enter runs, and in app mode it stops the active app.
 - **TabBar.tsx** - Horizontal scrollable tabs with file icons, modified dot indicator, close buttons.
 - **CodeEditor.tsx** - CodeMirror 6 React wrapper using Compartment-based dynamic reconfiguration for theme, language, tabSize, wordWrap, and fontSize.
 - **cmLanguages.ts** - Maps language strings to CodeMirror language extensions.
 - **cmTheme.ts** - Light/dark theme creation for CodeMirror.
 
 ### Preview Components (src/components/preview/)
-- **PreviewPane.tsx** - Live HTML rendering via `<iframe srcdoc>` with `sandbox="allow-scripts"`. Supports HTML (with inlined CSS/JS assets), SVG (rendered), markdown/json/mermaid (raw), and Python execution output. Python output auto-detects HTML (renders in iframe) vs plain text (renders in `<pre>`). Shows running spinner, "Run to see preview" placeholder, and blinking cursor during streaming. Refresh button triggers `requestRefresh()`.
+- **PreviewPane.tsx** - Supports three preview paths: HTML via `<iframe srcdoc>` with inlined assets, Python script output (text or HTML auto-detected), and URL mode for local Python web apps (Dash) via `<iframe src>`. Includes waiting and running states plus refresh control.
 
 ### Console Components (src/components/console/)
 - **ConsolePanel.tsx** - Bottom panel with Console/Problems tab switcher. Console entries color-coded by type. Problems tab shows severity icons (error/warning), message, file path + line number. Clicking a problem opens the file. Badge count on Problems tab label. Clear button scoped to active tab.
@@ -99,7 +101,7 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 ### Hooks (src/hooks/)
 - **useAutoSave.ts** - Debounced auto-save triggered by editor content changes
 - **usePreview.ts** - Watches editor tabs + active project + refresh key. Debounces 300ms, builds HTML preview (inlines CSS/JS assets) or sets raw content for other preview types.
-- **useCodeExecution.ts** - Manages Python execution lifecycle. Saves file, clears console/problems, and (when `isTauriRuntime()` is true) listens for `python-output`/`python-exit` Tauri events. Parses Python tracebacks for file/line info. For web languages, triggers preview refresh instead.
+- **useCodeExecution.ts** - Manages execution lifecycle. Saves file, clears console/problems, and (when `isTauriRuntime()` is true) listens for `python-output`, `python-app-ready`, and `python-exit` events. Detects Dash-like Python files and runs them in app mode (`run_python_app` + `stop_python_app`); other Python files use script mode (`run_python`). Parses Python tracebacks for file/line info. For web languages, triggers preview refresh.
 - **useKeyboardShortcuts.ts** - Global keyboard shortcut handling (Cmd+B sidebar, Cmd+J bottom panel, Cmd+\ preview)
 - **useWorkspace.ts** - Initializes workspace on mount: resolves path, lists projects, auto-selects first, loads file tree, starts file watcher, listens for `fs-change` events. Workspace resolution is environment-aware: repo workspace in dev (`pnpm tauri dev` / browser), home workspace in production Tauri.
 - **useFileOperations.ts** - File CRUD callbacks: saveFile, createNewFile, createNewFolder, deleteFile, renameFile. Refreshes file tree after mutations.
@@ -131,13 +133,15 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 5. Refresh button triggers `requestRefresh()` which increments previewRefreshKey
 
 ### Python Execution
-1. User clicks run -> `invoke("run_python")` with project path and script name
-2. Backend prefers `uv`, creates venv if needed, and executes the script
-3. If `uv` execution fails, backend emits stderr context and retries with `python3`/`python` when available
-4. stdout/stderr streamed via `python-output` events -> `executionStore` appends console entries + `pythonOutput` (stdout only)
-5. stderr parsed for traceback file/line info -> added as problems
-6. Process completion emits `python-exit` with exit code, sets `pythonOutputReady`
-7. Preview pane renders accumulated `pythonOutput` — auto-detects HTML for iframe rendering
+1. User clicks run on a Python file.
+2. `useCodeExecution` detects execution mode:
+   - Script mode: default Python execution (`invoke("run_python")`)
+   - App mode: Dash-like files (`invoke("run_python_app")`)
+3. Backend resolves runtime (`uv` first, else `python3`/`python`) and sets `DASH_HOST` / `DASH_PORT` / `PORT` env vars for app mode.
+4. App mode picks an available localhost port (starting at 8050), spawns a managed process, streams logs via `python-output`, and probes readiness.
+5. On readiness, backend emits `python-app-ready` with URL; frontend switches preview to URL iframe mode.
+6. Script mode uses `python-output` for stdout/stderr and updates `pythonOutput`; stderr tracebacks are parsed into Problems.
+7. `python-exit` finalizes either mode: stops running state and keeps script output preview (script mode) or clears URL preview (app mode).
 
 ### Project Management
 1. Workspace path is resolved and stored:

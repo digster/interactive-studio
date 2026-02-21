@@ -57,9 +57,11 @@ function PythonPreview() {
 export default function PreviewPane() {
   const previewContent = useExecutionStore((s) => s.previewContent);
   const previewType = useExecutionStore((s) => s.previewType);
+  const previewUrl = useExecutionStore((s) => s.previewUrl);
   const requestRefresh = useExecutionStore((s) => s.requestRefresh);
 
-  const hasContent = previewType !== 'none' && previewType !== 'python' && previewContent.length > 0;
+  const hasContent =
+    previewType !== 'none' && previewType !== 'python' && previewType !== 'url' && previewContent.length > 0;
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-primary)] overflow-hidden">
@@ -87,6 +89,14 @@ export default function PreviewPane() {
       <div className="flex-1 min-h-0">
         {previewType === 'python' ? (
           <PythonPreview />
+        ) : previewType === 'url' && previewUrl ? (
+          <iframe src={previewUrl} title="Python App Preview" className="w-full h-full border-0 bg-white" />
+        ) : previewType === 'url' ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-sm text-[var(--text-muted)] select-none">
+              Waiting for app server...
+            </p>
+          </div>
         ) : hasContent ? (
           previewType === 'html' ? (
             <iframe

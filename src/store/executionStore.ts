@@ -9,7 +9,8 @@ export interface ConsoleEntry {
   timestamp: number;
 }
 
-export type PreviewType = 'html' | 'markdown' | 'mermaid' | 'svg' | 'json' | 'python' | 'none';
+export type PreviewType = 'html' | 'markdown' | 'mermaid' | 'svg' | 'json' | 'python' | 'url' | 'none';
+export type RunningMode = 'script' | 'app' | null;
 
 export type ProblemSeverity = 'error' | 'warning';
 
@@ -27,16 +28,19 @@ export interface ExecutionState {
   consoleEntries: ConsoleEntry[];
   previewContent: string;
   previewType: PreviewType;
+  previewUrl: string | null;
   previewRefreshKey: number;
   lastError: string | null;
   problems: Problem[];
   pythonOutput: string;
   pythonOutputReady: boolean;
+  runningMode: RunningMode;
 
   setRunning: (running: boolean) => void;
   addConsoleEntry: (type: ConsoleEntryType, content: string) => void;
   clearConsole: () => void;
   setPreview: (content: string, type: PreviewType) => void;
+  setPreviewUrl: (url: string | null) => void;
   clearPreview: () => void;
   setError: (error: string | null) => void;
   requestRefresh: () => void;
@@ -45,6 +49,7 @@ export interface ExecutionState {
   appendPythonOutput: (data: string) => void;
   clearPythonOutput: () => void;
   setPythonOutputReady: (ready: boolean) => void;
+  setRunningMode: (mode: RunningMode) => void;
 }
 
 export const useExecutionStore = create<ExecutionState>()((set) => ({
@@ -52,11 +57,13 @@ export const useExecutionStore = create<ExecutionState>()((set) => ({
   consoleEntries: [],
   previewContent: '',
   previewType: 'none',
+  previewUrl: null,
   previewRefreshKey: 0,
   lastError: null,
   problems: [],
   pythonOutput: '',
   pythonOutputReady: false,
+  runningMode: null,
 
   setRunning: (running) => set({ isRunning: running }),
 
@@ -76,9 +83,16 @@ export const useExecutionStore = create<ExecutionState>()((set) => ({
   clearConsole: () => set({ consoleEntries: [] }),
 
   setPreview: (content, type) =>
-    set({ previewContent: content, previewType: type }),
+    set({ previewContent: content, previewType: type, previewUrl: null }),
 
-  clearPreview: () => set({ previewContent: '', previewType: 'none' }),
+  setPreviewUrl: (url) =>
+    set({
+      previewUrl: url,
+      previewContent: '',
+      previewType: url ? 'url' : 'none',
+    }),
+
+  clearPreview: () => set({ previewContent: '', previewType: 'none', previewUrl: null }),
 
   setError: (error) =>
     set((state) => {
@@ -122,4 +136,6 @@ export const useExecutionStore = create<ExecutionState>()((set) => ({
   clearPythonOutput: () => set({ pythonOutput: '', pythonOutputReady: false }),
 
   setPythonOutputReady: (ready) => set({ pythonOutputReady: ready }),
+
+  setRunningMode: (mode) => set({ runningMode: mode }),
 }));

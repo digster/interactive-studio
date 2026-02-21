@@ -27,7 +27,12 @@ export function usePreview() {
 
     // For Python, just set the preview type — don't clear pythonOutput
     if (pvType === 'python') {
-      useExecutionStore.getState().setPreview('', 'python');
+      const { runningMode, previewUrl, setPreview, setPreviewUrl } = useExecutionStore.getState();
+      if (runningMode === 'app' && previewUrl) {
+        setPreviewUrl(previewUrl);
+      } else {
+        setPreview('', 'python');
+      }
       return;
     }
 

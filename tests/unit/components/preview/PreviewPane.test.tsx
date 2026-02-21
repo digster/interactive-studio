@@ -8,9 +8,11 @@ describe('PreviewPane', () => {
     useExecutionStore.setState({
       previewType: 'none',
       previewContent: '',
+      previewUrl: null,
       pythonOutput: '',
       pythonOutputReady: false,
       isRunning: false,
+      runningMode: null,
     });
   });
 
@@ -89,6 +91,27 @@ describe('PreviewPane', () => {
     useExecutionStore.setState({ previewType: 'python' });
     render(<PreviewPane />);
     expect(screen.getByText('python')).toBeInTheDocument();
+  });
+
+  it('should render URL preview iframe for app mode', () => {
+    useExecutionStore.setState({
+      previewType: 'url',
+      previewUrl: 'http://127.0.0.1:8050/',
+    });
+    render(<PreviewPane />);
+    const iframe = document.querySelector('iframe');
+    expect(iframe).toBeTruthy();
+    expect(iframe?.getAttribute('src')).toBe('http://127.0.0.1:8050/');
+    expect(iframe?.title).toBe('Python App Preview');
+  });
+
+  it('should show waiting message when URL preview has no URL yet', () => {
+    useExecutionStore.setState({
+      previewType: 'url',
+      previewUrl: null,
+    });
+    render(<PreviewPane />);
+    expect(screen.getByText('Waiting for app server...')).toBeInTheDocument();
   });
 
   it('should show text output as pre even while still running', () => {
