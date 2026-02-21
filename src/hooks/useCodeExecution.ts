@@ -10,6 +10,9 @@ import { isTauriRuntime } from '../lib/runtime';
 const TRACEBACK_RE = /File "(.+)", line (\d+)/;
 const DASH_IMPORT_RE = /\b(from\s+dash\s+import|import\s+dash)\b/i;
 const DASH_APP_RE = /\bDash\s*\(|\.run_server\s*\(|\.run\s*\(/;
+const FASTAPI_IMPORT_RE = /\b(from\s+fastapi\s+import|import\s+fastapi)\b/i;
+const FASTAPI_APP_RE = /\bFastAPI\s*\(/;
+const UVICORN_RUN_RE = /\buvicorn\.run\s*\(/;
 
 function parseTraceback(text: string): { filePath: string; line: number } | null {
   const match = TRACEBACK_RE.exec(text);
@@ -19,6 +22,18 @@ function parseTraceback(text: string): { filePath: string; line: number } | null
 
 function looksLikeDashApp(content: string): boolean {
   return DASH_IMPORT_RE.test(content) && DASH_APP_RE.test(content);
+}
+
+function looksLikeFastApiApp(content: string): boolean {
+  return (
+    FASTAPI_IMPORT_RE.test(content) &&
+    FASTAPI_APP_RE.test(content) &&
+    UVICORN_RUN_RE.test(content)
+  );
+}
+
+function looksLikePythonWebApp(content: string): boolean {
+  return looksLikeDashApp(content) || looksLikeFastApiApp(content);
 }
 
 export function useCodeExecution() {
@@ -146,11 +161,11 @@ export function useCodeExecution() {
       useUIStore.getState().setBottomPanelActiveTab('console');
 
       setRunning(true);
-      const isDash = looksLikeDashApp(activeTab.content);
+      const isPythonWebApp = looksLikePythonWebApp(activeTab.content);
 
-      if (isDash) {
+      if (isPythonWebApp) {
         setRunningMode('app');
-        addConsoleEntry('info', `Starting Dash app ${activeTab.name}...`);
+        addConsoleEntry('info', `Starting Python web app ${activeTab.name}...`);
         try {
           await tauriFS.runPythonApp(activeProject.path, activeTab.name, '127.0.0.1', 8050);
         } catch (err) {

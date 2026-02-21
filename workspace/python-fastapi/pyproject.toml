@@ -1,0 +1,9 @@
+[project]
+name = "interactive-studio-fastapi-example"
+version = "0.1.0"
+description = "FastAPI example app for Interactive Studio"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi>=0.116.0,<1.0.0",
+  "uvicorn>=0.35.0,<1.0.0",
+]

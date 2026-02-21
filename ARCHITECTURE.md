@@ -40,7 +40,7 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 - **workspace.rs** - Project-level operations: list_projects, create_project (with template scaffolding: blank/html/python/markdown), get_project_tree (recursive tree with noise filtering).
 - **python.rs** - Python execution has two modes:
   - `run_python`: one-shot script execution (uv-first with fallback to system Python), emits `python-output` and `python-exit`.
-  - `run_python_app` / `stop_python_app`: managed long-running Python app process (used for Dash), emits `python-output`, `python-app-ready` (URL), and `python-exit`. Includes local port selection (starting from 8050) and readiness probing.
+  - `run_python_app` / `stop_python_app`: managed long-running Python app process (used for Dash/FastAPI), emits `python-output`, `python-app-ready` (URL), and `python-exit`. Includes local port selection (starting from 8050) and readiness probing.
 - **shell.rs** - Generic command execution: execute_command with configurable args and working directory.
 
 ### Watchers (src/watchers/)
@@ -82,7 +82,7 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 - **cmTheme.ts** - Light/dark theme creation for CodeMirror.
 
 ### Preview Components (src/components/preview/)
-- **PreviewPane.tsx** - Supports three preview paths: HTML via `<iframe srcdoc>` with inlined assets, Python script output (text or HTML auto-detected), and URL mode for local Python web apps (Dash) via `<iframe src>`. Includes waiting and running states plus refresh control.
+- **PreviewPane.tsx** - Supports three preview paths: HTML via `<iframe srcdoc>` with inlined assets, Python script output (text or HTML auto-detected), and URL mode for local Python web apps (Dash/FastAPI) via `<iframe src>`. Includes waiting and running states plus refresh control.
 
 ### Console Components (src/components/console/)
 - **ConsolePanel.tsx** - Bottom panel with Console/Problems tab switcher. Console entries color-coded by type. Problems tab shows severity icons (error/warning), message, file path + line number. Clicking a problem opens the file. Badge count on Problems tab label. Clear button scoped to active tab.
@@ -101,7 +101,7 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 ### Hooks (src/hooks/)
 - **useAutoSave.ts** - Debounced auto-save triggered by editor content changes
 - **usePreview.ts** - Watches editor tabs + active project + refresh key. Debounces 300ms, builds HTML preview (inlines CSS/JS assets) or sets raw content for other preview types.
-- **useCodeExecution.ts** - Manages execution lifecycle. Saves file, clears console/problems, and (when `isTauriRuntime()` is true) listens for `python-output`, `python-app-ready`, and `python-exit` events. Detects Dash-like Python files and runs them in app mode (`run_python_app` + `stop_python_app`); other Python files use script mode (`run_python`). Parses Python tracebacks for file/line info. For web languages, triggers preview refresh.
+- **useCodeExecution.ts** - Manages execution lifecycle. Saves file, clears console/problems, and (when `isTauriRuntime()` is true) listens for `python-output`, `python-app-ready`, and `python-exit` events. Detects Dash/FastAPI-like Python files and runs them in app mode (`run_python_app` + `stop_python_app`); other Python files use script mode (`run_python`). Parses Python tracebacks for file/line info. For web languages, triggers preview refresh.
 - **useKeyboardShortcuts.ts** - Global keyboard shortcut handling (Cmd+B sidebar, Cmd+J bottom panel, Cmd+\ preview)
 - **useWorkspace.ts** - Initializes workspace on mount: resolves path, lists projects, auto-selects first, loads file tree, starts file watcher, listens for `fs-change` events. Workspace resolution is environment-aware: repo workspace in dev (`pnpm tauri dev` / browser), home workspace in production Tauri.
 - **useFileOperations.ts** - File CRUD callbacks: saveFile, createNewFile, createNewFolder, deleteFile, renameFile. Refreshes file tree after mutations.
@@ -136,8 +136,8 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 1. User clicks run on a Python file.
 2. `useCodeExecution` detects execution mode:
    - Script mode: default Python execution (`invoke("run_python")`)
-   - App mode: Dash-like files (`invoke("run_python_app")`)
-3. Backend resolves runtime (`uv` first, else `python3`/`python`) and sets `DASH_HOST` / `DASH_PORT` / `PORT` env vars for app mode.
+   - App mode: Dash/FastAPI-like files (`invoke("run_python_app")`)
+3. Backend resolves runtime (`uv` first, else `python3`/`python`) and sets `DASH_HOST` / `DASH_PORT` / `HOST` / `PORT` env vars for app mode.
 4. App mode picks an available localhost port (starting at 8050), spawns a managed process, streams logs via `python-output`, and probes readiness.
 5. On readiness, backend emits `python-app-ready` with URL; frontend switches preview to URL iframe mode.
 6. Script mode uses `python-output` for stdout/stderr and updates `pythonOutput`; stderr tracebacks are parsed into Problems.

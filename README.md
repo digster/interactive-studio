@@ -9,7 +9,7 @@ Write code in an editor pane and see results instantly: live HTML preview, conso
 - **Multi-language support**: HTML/CSS/JS, TypeScript/JSX/TSX, Python, Markdown, Mermaid, SVG, JSON
 - **Live preview**: Auto-refreshing iframe sandbox for web code, rendered previews for markdown/diagrams
 - **Python execution**: Runs via `uv` with per-project venvs, falls back to system Python or Pyodide (WASM)
-- **Python app preview**: Detects Dash apps, starts a local server, and embeds it in the preview pane with Run/Stop controls
+- **Python app preview**: Detects Dash/FastAPI apps, starts a local server, and embeds it in the preview pane with Run/Stop controls
 - **File management**: Full file tree with create, rename, delete operations
 - **CodeMirror 6 editor**: Syntax highlighting, autocomplete, bracket matching, multi-tab support
 - **Resizable panels**: Sidebar, editor, preview, and console panels with draggable dividers
@@ -84,6 +84,7 @@ The `workspace/` directory ships with several example projects that demonstrate 
 | `js-advanced` | HTML/CSS/JS | Canvas-based particle system with glassmorphism controls, mouse attraction physics, and connection lines |
 | `python-viz` | Python | Unicode-based data visualization: bar charts, sparklines, scatter plots, histograms (no external dependencies) |
 | `python-dash` | Python | Dash + Plotly web app rendered from a local Python server directly in the preview pane |
+| `python-fastapi` | Python | FastAPI + Uvicorn web app rendered from a local Python server directly in the preview pane |
 
 These projects are auto-discovered at startup. Drop any folder into `workspace/` to add your own.
 

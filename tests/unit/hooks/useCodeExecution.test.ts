@@ -17,13 +17,21 @@ import * as tauriFS from '../../../src/lib/tauriFS';
 
 const mockedTauriFS = vi.mocked(tauriFS);
 
-function seedPythonTab(content: string) {
+function seedPythonTab(
+  content: string,
+  options: { projectName?: string; fileName?: string } = {},
+) {
+  const projectName = options.projectName ?? 'python-dash';
+  const fileName = options.fileName ?? 'app.py';
+  const projectPath = `/workspace/${projectName}`;
+  const filePath = `${projectPath}/${fileName}`;
+
   useEditorStore.setState({
     tabs: [
       {
-        id: '/workspace/python-dash/app.py',
-        name: 'app.py',
-        path: '/workspace/python-dash/app.py',
+        id: filePath,
+        name: fileName,
+        path: filePath,
         language: 'python',
         content,
         savedContent: content,
@@ -31,13 +39,13 @@ function seedPythonTab(content: string) {
         cursorPosition: { line: 1, col: 1 },
       },
     ],
-    activeTabId: '/workspace/python-dash/app.py',
+    activeTabId: filePath,
   });
 
   useWorkspaceStore.setState({
     activeProject: {
-      name: 'python-dash',
-      path: '/workspace/python-dash',
+      name: projectName,
+      path: projectPath,
     },
   });
 }
@@ -84,6 +92,41 @@ describe('useCodeExecution', () => {
     expect(mockedTauriFS.runPythonApp).toHaveBeenCalledWith(
       '/workspace/python-dash',
       'app.py',
+      '127.0.0.1',
+      8050,
+    );
+    expect(mockedTauriFS.runPython).not.toHaveBeenCalled();
+    expect(useExecutionStore.getState().runningMode).toBe('app');
+    expect(useExecutionStore.getState().isRunning).toBe(true);
+  });
+
+  it('starts FastAPI files with runPythonApp', async () => {
+    seedPythonTab(
+      [
+        'from fastapi import FastAPI',
+        'import uvicorn',
+        '',
+        'app = FastAPI()',
+        '',
+        '@app.get("/")',
+        'def read_root():',
+        '    return {"message": "hello"}',
+        '',
+        'if __name__ == "__main__":',
+        '    uvicorn.run(app, host="127.0.0.1", port=8000)',
+      ].join('\n'),
+      { projectName: 'python-fastapi', fileName: 'main.py' },
+    );
+
+    const { result } = renderHook(() => useCodeExecution());
+
+    await act(async () => {
+      await result.current.execute();
+    });
+
+    expect(mockedTauriFS.runPythonApp).toHaveBeenCalledWith(
+      '/workspace/python-fastapi',
+      'main.py',
       '127.0.0.1',
       8050,
     );

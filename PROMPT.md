@@ -133,3 +133,5 @@ Follow-up fixes after 2026-02-18 feature batch:
 Can we use dash by plotly in our app? if yes, add an example in the workspace folder.
 
 Implement the plan.
+
+in our current app can we also use python code which requires backend like fastapi? If yes, add a fastapi example in the workspace folder.
