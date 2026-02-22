@@ -174,4 +174,5 @@ pnpm test:watch
 
 ## Configuration
 - `src-tauri/tauri.conf.json` - Tauri app config (window size, CSP, bundle settings)
+  - Production CSP explicitly allows loopback iframe sources (`http://127.0.0.1:*`, `http://localhost:*`) so embedded Dash/FastAPI previews can render in the preview pane.
 - `src-tauri/capabilities/default.json` - Permission scopes for shell commands and filesystem access (scoped to $HOME)

@@ -153,3 +153,7 @@ Implement the plan.
 [Image #1][Image #2] First image error for fast api example, second for dash example. Both for production build.
 
 Implement the plan.
+
+---
+
+[Image #1] getting a white preview for the fastapi and dash py examples in prodcution build.
