@@ -157,3 +157,9 @@ Implement the plan.
 ---
 
 [Image #1] getting a white preview for the fastapi and dash py examples in prodcution build.
+
+Implement the plan.
+
+---
+
+Fix HTML Preview JavaScript not working in production. Add `dangerousDisableAssetCspModification` to Tauri security config to prevent nonce replacement of `'unsafe-inline'` in production builds.
