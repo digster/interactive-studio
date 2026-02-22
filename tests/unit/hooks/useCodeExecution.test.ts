@@ -19,12 +19,20 @@ const mockedTauriFS = vi.mocked(tauriFS);
 
 function seedPythonTab(
   content: string,
-  options: { projectName?: string; fileName?: string } = {},
+  options: {
+    projectName?: string;
+    fileName?: string;
+    activeProjectName?: string;
+    projects?: string[];
+  } = {},
 ) {
   const projectName = options.projectName ?? 'python-dash';
   const fileName = options.fileName ?? 'app.py';
   const projectPath = `/workspace/${projectName}`;
   const filePath = `${projectPath}/${fileName}`;
+  const activeProjectName = options.activeProjectName ?? projectName;
+  const activeProjectPath = `/workspace/${activeProjectName}`;
+  const projectNames = options.projects ?? [projectName];
 
   useEditorStore.setState({
     tabs: [
@@ -44,9 +52,10 @@ function seedPythonTab(
 
   useWorkspaceStore.setState({
     activeProject: {
-      name: projectName,
-      path: projectPath,
+      name: activeProjectName,
+      path: activeProjectPath,
     },
+    projects: projectNames.map((name) => ({ name, path: `/workspace/${name}` })),
   });
 }
 
@@ -147,6 +156,31 @@ describe('useCodeExecution', () => {
     expect(mockedTauriFS.runPython).toHaveBeenCalledWith('/workspace/python-dash', 'app.py');
     expect(mockedTauriFS.runPythonApp).not.toHaveBeenCalled();
     expect(useExecutionStore.getState().runningMode).toBe('script');
+    expect(useExecutionStore.getState().isRunning).toBe(true);
+  });
+
+  it('runs using the tab project when selected project is different', async () => {
+    seedPythonTab('from dash import Dash\napp = Dash(__name__)\napp.run(debug=True)\n', {
+      projectName: 'python-dash',
+      fileName: 'app.py',
+      activeProjectName: 'python-fastapi',
+      projects: ['python-fastapi', 'python-dash'],
+    });
+
+    const { result } = renderHook(() => useCodeExecution());
+
+    await act(async () => {
+      await result.current.execute();
+    });
+
+    expect(mockedTauriFS.runPythonApp).toHaveBeenCalledWith(
+      '/workspace/python-dash',
+      'app.py',
+      '127.0.0.1',
+      8050,
+    );
+    expect(mockedTauriFS.runPython).not.toHaveBeenCalled();
+    expect(useExecutionStore.getState().runningMode).toBe('app');
     expect(useExecutionStore.getState().isRunning).toBe(true);
   });
 

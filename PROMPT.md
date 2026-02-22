@@ -145,3 +145,7 @@ where is the workspace folder located when the app is built for production? Dont
 make sure the workspace examples are available in the production app also.
 
 Implement the plan.
+
+---
+
+[Image #1] got this error while trying the fast api example in the production app.

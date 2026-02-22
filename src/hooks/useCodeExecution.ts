@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useEditorStore } from '../store/editorStore';
 import { useExecutionStore } from '../store/executionStore';
-import { useWorkspaceStore } from '../store/workspaceStore';
+import { type Project, useWorkspaceStore } from '../store/workspaceStore';
 import { useUIStore } from '../store/uiStore';
 import * as tauriFS from '../lib/tauriFS';
 import { getPreviewType } from '../lib/languageDetect';
@@ -34,6 +34,29 @@ function looksLikeFastApiApp(content: string): boolean {
 
 function looksLikePythonWebApp(content: string): boolean {
   return looksLikeDashApp(content) || looksLikeFastApiApp(content);
+}
+
+function resolvePythonExecutionTarget(
+  tabPath: string,
+  activeProject: Project,
+  projects: Project[],
+): { projectPath: string; scriptPath: string } | null {
+  const candidates = [
+    activeProject,
+    ...projects.filter((project) => project.path !== activeProject.path),
+  ];
+
+  for (const project of candidates) {
+    const prefix = project.path.endsWith('/') ? project.path : `${project.path}/`;
+    if (!tabPath.startsWith(prefix)) continue;
+
+    const scriptPath = tabPath.slice(prefix.length);
+    if (!scriptPath) continue;
+
+    return { projectPath: project.path, scriptPath };
+  }
+
+  return null;
 }
 
 export function useCodeExecution() {
@@ -115,7 +138,7 @@ export function useCodeExecution() {
     if (!activeTab) return;
     if (useExecutionStore.getState().isRunning) return;
 
-    const activeProject = useWorkspaceStore.getState().activeProject;
+    const { activeProject, projects } = useWorkspaceStore.getState();
     if (!activeProject) return;
 
     const pvType = getPreviewType(activeTab.language);
@@ -150,6 +173,19 @@ export function useCodeExecution() {
         }
       }
 
+      const executionTarget = resolvePythonExecutionTarget(
+        activeTab.path,
+        activeProject,
+        projects,
+      );
+      if (!executionTarget) {
+        addConsoleEntry(
+          'error',
+          `Failed to start: ${activeTab.path} is not inside a known project path.`,
+        );
+        return;
+      }
+
       clearConsole();
       clearProblems();
       clearPythonOutput();
@@ -167,7 +203,12 @@ export function useCodeExecution() {
         setRunningMode('app');
         addConsoleEntry('info', `Starting Python web app ${activeTab.name}...`);
         try {
-          await tauriFS.runPythonApp(activeProject.path, activeTab.name, '127.0.0.1', 8050);
+          await tauriFS.runPythonApp(
+            executionTarget.projectPath,
+            executionTarget.scriptPath,
+            '127.0.0.1',
+            8050,
+          );
         } catch (err) {
           setRunning(false);
           setRunningMode(null);
@@ -180,7 +221,10 @@ export function useCodeExecution() {
       addConsoleEntry('info', `Running ${activeTab.name}...`);
 
       try {
-        await tauriFS.runPython(activeProject.path, activeTab.name);
+        await tauriFS.runPython(
+          executionTarget.projectPath,
+          executionTarget.scriptPath,
+        );
       } catch (err) {
         setRunning(false);
         setRunningMode(null);
