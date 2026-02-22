@@ -5,6 +5,121 @@ use std::time::UNIX_EPOCH;
 
 use super::filesystem::FileEntry;
 
+const DEFAULT_EXAMPLE_FILES: &[(&str, &str)] = &[
+    (
+        "hello-world/index.html",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../workspace/hello-world/index.html"
+        )),
+    ),
+    (
+        "hello-world/main.js",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../workspace/hello-world/main.js"
+        )),
+    ),
+    (
+        "hello-world/style.css",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../workspace/hello-world/style.css"
+        )),
+    ),
+    (
+        "js-advanced/index.html",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../workspace/js-advanced/index.html"
+        )),
+    ),
+    (
+        "js-advanced/main.js",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../workspace/js-advanced/main.js"
+        )),
+    ),
+    (
+        "js-advanced/style.css",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../workspace/js-advanced/style.css"
+        )),
+    ),
+    (
+        "python-hello-world/main.py",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../workspace/python-hello-world/main.py"
+        )),
+    ),
+    (
+        "python-viz/main.py",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../workspace/python-viz/main.py"
+        )),
+    ),
+    (
+        "python-dash/README.md",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../workspace/python-dash/README.md"
+        )),
+    ),
+    (
+        "python-dash/app.py",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../workspace/python-dash/app.py"
+        )),
+    ),
+    (
+        "python-dash/pyproject.toml",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../workspace/python-dash/pyproject.toml"
+        )),
+    ),
+    (
+        "python-dash/uv.lock",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../workspace/python-dash/uv.lock"
+        )),
+    ),
+    (
+        "python-fastapi/README.md",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../workspace/python-fastapi/README.md"
+        )),
+    ),
+    (
+        "python-fastapi/main.py",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../workspace/python-fastapi/main.py"
+        )),
+    ),
+    (
+        "python-fastapi/pyproject.toml",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../workspace/python-fastapi/pyproject.toml"
+        )),
+    ),
+    (
+        "python-fastapi/uv.lock",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../workspace/python-fastapi/uv.lock"
+        )),
+    ),
+];
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectInfo {
     pub name: String,
@@ -17,9 +132,18 @@ pub fn list_projects(workspace_path: String) -> Result<Vec<ProjectInfo>, String>
     let workspace = Path::new(&workspace_path);
 
     if !workspace.exists() {
+        println!(
+            "Workspace '{}' not found. Seeding bundled examples.",
+            workspace.display()
+        );
         fs::create_dir_all(workspace)
             .map_err(|e| format!("Failed to create workspace directory: {}", e))?;
-        return Ok(Vec::new());
+        seed_default_examples(workspace)?;
+        println!(
+            "Seeded {} example files into '{}'.",
+            DEFAULT_EXAMPLE_FILES.len(),
+            workspace.display()
+        );
     }
 
     let entries = fs::read_dir(workspace)
@@ -62,6 +186,36 @@ pub fn list_projects(workspace_path: String) -> Result<Vec<ProjectInfo>, String>
     projects.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
 
     Ok(projects)
+}
+
+fn seed_default_examples(workspace_root: &Path) -> Result<(), String> {
+    for (relative_path, contents) in DEFAULT_EXAMPLE_FILES {
+        let destination = workspace_root.join(relative_path);
+        let parent = destination.parent().ok_or_else(|| {
+            format!(
+                "Failed to derive parent directory for seeded file '{}'",
+                destination.display()
+            )
+        })?;
+
+        fs::create_dir_all(parent).map_err(|e| {
+            format!(
+                "Failed to create directory '{}' while seeding examples: {}",
+                parent.display(),
+                e
+            )
+        })?;
+
+        fs::write(&destination, contents).map_err(|e| {
+            format!(
+                "Failed to write seeded file '{}': {}",
+                destination.display(),
+                e
+            )
+        })?;
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -252,4 +406,115 @@ fn build_tree(dir: &Path) -> Result<Vec<FileEntry>, String> {
     });
 
     Ok(entries)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+    use std::path::{Path, PathBuf};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_path(label: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before UNIX_EPOCH")
+            .as_nanos();
+        std::env::temp_dir().join(format!("interactive-studio-{label}-{nonce}"))
+    }
+
+    fn cleanup_path(path: &Path) {
+        if path.is_dir() {
+            let _ = fs::remove_dir_all(path);
+        } else {
+            let _ = fs::remove_file(path);
+        }
+    }
+
+    #[test]
+    fn list_projects_seeds_examples_for_missing_workspace() {
+        let workspace = unique_temp_path("seed-missing-workspace");
+
+        let projects = list_projects(workspace.to_string_lossy().to_string())
+            .expect("list_projects should seed examples when workspace is missing");
+
+        let project_names: HashSet<String> =
+            projects.into_iter().map(|project| project.name).collect();
+
+        for expected in [
+            "hello-world",
+            "js-advanced",
+            "python-hello-world",
+            "python-viz",
+            "python-dash",
+            "python-fastapi",
+        ] {
+            assert!(
+                project_names.contains(expected),
+                "missing seeded project: {expected}"
+            );
+        }
+
+        assert!(workspace.join("hello-world/index.html").exists());
+        assert!(workspace.join("python-fastapi/main.py").exists());
+        cleanup_path(&workspace);
+    }
+
+    #[test]
+    fn list_projects_does_not_seed_when_workspace_already_exists() {
+        let workspace = unique_temp_path("existing-workspace");
+        fs::create_dir_all(workspace.join("my-custom"))
+            .expect("should create custom project directory for test");
+        fs::write(
+            workspace.join("my-custom/notes.txt"),
+            "hello from custom project",
+        )
+        .expect("should write custom project file");
+
+        let projects = list_projects(workspace.to_string_lossy().to_string())
+            .expect("list_projects should read existing workspace");
+        let project_names: HashSet<String> =
+            projects.into_iter().map(|project| project.name).collect();
+
+        assert_eq!(project_names.len(), 1, "workspace should remain unchanged");
+        assert!(project_names.contains("my-custom"));
+        assert!(!workspace.join("hello-world").exists());
+        cleanup_path(&workspace);
+    }
+
+    #[test]
+    fn seed_default_examples_writes_expected_content() {
+        let workspace = unique_temp_path("seed-content-check");
+        fs::create_dir_all(&workspace).expect("should create temp workspace");
+
+        seed_default_examples(&workspace).expect("should seed bundled examples");
+
+        let dash_app = fs::read_to_string(workspace.join("python-dash/app.py"))
+            .expect("should read seeded Dash app");
+        let fastapi_main = fs::read_to_string(workspace.join("python-fastapi/main.py"))
+            .expect("should read seeded FastAPI app");
+
+        assert!(dash_app.contains("app = Dash(__name__)"));
+        assert!(fastapi_main.contains("app = FastAPI"));
+        cleanup_path(&workspace);
+    }
+
+    #[test]
+    fn seed_default_examples_returns_error_for_invalid_workspace_root() {
+        let workspace_file = unique_temp_path("seed-invalid-root");
+        if let Some(parent) = workspace_file.parent() {
+            fs::create_dir_all(parent).expect("should create parent temp directory");
+        }
+        fs::write(&workspace_file, "this is a file, not a directory")
+            .expect("should create invalid workspace file");
+
+        let error = seed_default_examples(&workspace_file)
+            .expect_err("seeding should fail when workspace root is not a directory");
+
+        assert!(
+            error.contains("Failed to create directory"),
+            "unexpected error message: {error}"
+        );
+        cleanup_path(&workspace_file);
+    }
 }

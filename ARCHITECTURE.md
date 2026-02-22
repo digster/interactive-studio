@@ -37,7 +37,7 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 
 ### Command Modules (src/commands/)
 - **filesystem.rs** - Low-level file CRUD: read_file, write_file, create_file, create_dir, delete_path, rename_path, list_dir. Defines the shared `FileEntry` struct used across modules.
-- **workspace.rs** - Project-level operations: list_projects, create_project (with template scaffolding: blank/html/python/markdown), get_project_tree (recursive tree with noise filtering).
+- **workspace.rs** - Project-level operations: list_projects, create_project (with template scaffolding: blank/html/python/markdown), get_project_tree (recursive tree with noise filtering). In production first run, `list_projects` seeds bundled workspace examples when the workspace directory does not exist.
 - **python.rs** - Python execution has two modes:
   - `run_python`: one-shot script execution (uv-first with fallback to system Python), emits `python-output` and `python-exit`.
   - `run_python_app` / `stop_python_app`: managed long-running Python app process (used for Dash/FastAPI), emits `python-output`, `python-app-ready` (URL), and `python-exit`. Includes local port selection (starting from 8050) and readiness probing.
@@ -147,7 +147,7 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 1. Workspace path is resolved and stored:
    - Dev/browser/Tauri dev -> repo workspace (`/Users/ishan/lab/interactive-studio/workspace`)
    - Production Tauri -> `$HOME/interactive-studio/workspace`
-2. `invoke("list_projects")` scans workspace directory for project folders
+2. `invoke("list_projects")` scans workspace directory for project folders; when the directory is missing (first run in production), backend creates it and seeds bundled example projects once
 3. `invoke("create_project")` scaffolds from template (Rust-side: blank/html/python/markdown)
 4. Client-side templates (React/Mermaid) write extra files after blank project creation
 5. `invoke("get_project_tree")` returns recursive FileEntry tree

@@ -135,3 +135,13 @@ Can we use dash by plotly in our app? if yes, add an example in the workspace fo
 Implement the plan.
 
 in our current app can we also use python code which requires backend like fastapi? If yes, add a fastapi example in the workspace folder.
+
+---
+
+## 2026-02-22
+
+where is the workspace folder located when the app is built for production? Dont do any changes.
+
+make sure the workspace examples are available in the production app also.
+
+Implement the plan.

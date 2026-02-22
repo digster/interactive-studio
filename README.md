@@ -87,5 +87,6 @@ The `workspace/` directory ships with several example projects that demonstrate 
 | `python-fastapi` | Python | FastAPI + Uvicorn web app rendered from a local Python server directly in the preview pane |
 
 These projects are auto-discovered at startup. Drop any folder into `workspace/` to add your own.
+In production builds, if `$HOME/interactive-studio/workspace` is missing on first launch, the app seeds these bundled examples automatically. Existing workspaces are not overwritten.
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed architecture documentation.
