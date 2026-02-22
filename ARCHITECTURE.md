@@ -40,7 +40,7 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 - **workspace.rs** - Project-level operations: list_projects, create_project (with template scaffolding: blank/html/python/markdown), get_project_tree (recursive tree with noise filtering). In production first run, `list_projects` seeds bundled workspace examples when the workspace directory does not exist.
 - **python.rs** - Python execution has two modes:
   - `run_python`: one-shot script execution (uv-first with fallback to system Python), emits `python-output` and `python-exit`.
-  - `run_python_app` / `stop_python_app`: managed long-running Python app process (used for Dash/FastAPI), emits `python-output`, `python-app-ready` (URL), and `python-exit`. Includes local port selection (starting from 8050) and readiness probing.
+  - `run_python_app` / `stop_python_app`: managed long-running Python app process (used for Dash/FastAPI), emits `python-output`, `python-app-ready` (URL), and `python-exit`. Includes local port selection (starting from 8050), readiness probing, uv discovery from PATH plus common macOS absolute paths, and pre-run dependency sync (`uv sync --locked` when `uv.lock` exists, else `uv sync`).
 - **shell.rs** - Generic command execution: execute_command with configurable args and working directory.
 
 ### Watchers (src/watchers/)
@@ -137,11 +137,12 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 2. `useCodeExecution` resolves the Python file's owning project from the active tab path, then detects execution mode:
    - Script mode: default Python execution (`invoke("run_python")`)
    - App mode: Dash/FastAPI-like files (`invoke("run_python_app")`)
-3. Backend resolves runtime (`uv` first, else `python3`/`python`) and sets `DASH_HOST` / `DASH_PORT` / `HOST` / `PORT` env vars for app mode.
-4. App mode picks an available localhost port (starting at 8050), spawns a managed process, streams logs via `python-output`, and probes readiness.
-5. On readiness, backend emits `python-app-ready` with URL; frontend switches preview to URL iframe mode.
-6. Script mode uses `python-output` for stdout/stderr and updates `pythonOutput`; stderr tracebacks are parsed into Problems.
-7. `python-exit` finalizes either mode: stops running state and keeps script output preview (script mode) or clears URL preview (app mode).
+3. Backend resolves runtime (`uv` first, else `python3`/`python`) with uv detection from PATH and common macOS absolute paths (`$HOME/.local/bin/uv`, `/opt/homebrew/bin/uv`, `/usr/local/bin/uv`), then sets `DASH_HOST` / `DASH_PORT` / `HOST` / `PORT` env vars for app mode.
+4. When uv runtime is selected for app mode, backend ensures a local `.venv` and runs dependency sync (`uv sync --locked` if `uv.lock` exists; otherwise `uv sync`) before process spawn.
+5. App mode picks an available localhost port (starting at 8050), spawns a managed process, streams logs via `python-output`, and probes readiness.
+6. On readiness, backend emits `python-app-ready` with URL; frontend switches preview to URL iframe mode.
+7. Script mode uses `python-output` for stdout/stderr and updates `pythonOutput`; stderr tracebacks are parsed into Problems.
+8. `python-exit` finalizes either mode: stops running state and keeps script output preview (script mode) or clears URL preview (app mode).
 
 ### Project Management
 1. Workspace path is resolved and stored:

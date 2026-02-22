@@ -149,3 +149,7 @@ Implement the plan.
 ---
 
 [Image #1] got this error while trying the fast api example in the production app.
+
+[Image #1][Image #2] First image error for fast api example, second for dash example. Both for production build.
+
+Implement the plan.

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -76,13 +76,161 @@ impl PythonProcessManager {
     }
 }
 
-/// Check if a command is available on the system PATH.
-fn command_exists(cmd: &str) -> bool {
-    Command::new("which")
-        .arg(cmd)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PythonRuntimeKind {
+    Uv,
+    Python,
+}
+
+#[derive(Debug, Clone)]
+struct PythonRuntime {
+    kind: PythonRuntimeKind,
+    executable: String,
+    display_name: String,
+}
+
+fn format_runtime_display(base_name: &str, executable: &str) -> String {
+    if executable == base_name {
+        base_name.to_string()
+    } else {
+        format!("{} ({})", base_name, executable)
+    }
+}
+
+/// Check whether a command can be spawned successfully with a probe flag.
+fn command_runs(executable: &str, probe_args: &[&str]) -> bool {
+    Command::new(executable)
+        .args(probe_args)
         .output()
         .map(|output| output.status.success())
         .unwrap_or(false)
+}
+
+fn resolve_executable_from_candidates(
+    command_name: &str,
+    probe_args: &[&str],
+    candidates: &[PathBuf],
+) -> Option<String> {
+    if command_runs(command_name, probe_args) {
+        return Some(command_name.to_string());
+    }
+
+    for candidate in candidates {
+        if !candidate.is_file() {
+            continue;
+        }
+
+        let executable = candidate.to_string_lossy().into_owned();
+        if command_runs(&executable, probe_args) {
+            return Some(executable);
+        }
+    }
+
+    None
+}
+
+fn uv_candidate_paths() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    if let Ok(home) = std::env::var("HOME") {
+        candidates.push(Path::new(&home).join(".local/bin/uv"));
+    }
+
+    candidates.push(PathBuf::from("/opt/homebrew/bin/uv"));
+    candidates.push(PathBuf::from("/usr/local/bin/uv"));
+
+    candidates
+}
+
+fn resolve_uv_executable() -> Option<String> {
+    resolve_executable_from_candidates("uv", &["--version"], &uv_candidate_paths())
+}
+
+fn resolve_python3_executable() -> Option<String> {
+    if command_runs("python3", &["--version"]) {
+        Some("python3".to_string())
+    } else {
+        None
+    }
+}
+
+fn resolve_python_executable() -> Option<String> {
+    if command_runs("python", &["--version"]) {
+        Some("python".to_string())
+    } else {
+        None
+    }
+}
+
+fn select_python_runtime(
+    uv_executable: Option<String>,
+    python3_executable: Option<String>,
+    python_executable: Option<String>,
+) -> Option<PythonRuntime> {
+    if let Some(uv) = uv_executable {
+        return Some(PythonRuntime {
+            kind: PythonRuntimeKind::Uv,
+            display_name: format_runtime_display("uv", &uv),
+            executable: uv,
+        });
+    }
+
+    if let Some(python3) = python3_executable {
+        return Some(PythonRuntime {
+            kind: PythonRuntimeKind::Python,
+            display_name: format_runtime_display("python3", &python3),
+            executable: python3,
+        });
+    }
+
+    python_executable.map(|python| PythonRuntime {
+        kind: PythonRuntimeKind::Python,
+        display_name: format_runtime_display("python", &python),
+        executable: python,
+    })
+}
+
+fn resolve_python_runtime() -> Option<PythonRuntime> {
+    select_python_runtime(
+        resolve_uv_executable(),
+        resolve_python3_executable(),
+        resolve_python_executable(),
+    )
+}
+
+fn build_uv_sync_args(project_dir: &Path) -> Vec<&'static str> {
+    let mut args = vec!["sync"];
+    if project_dir.join("uv.lock").exists() {
+        args.push("--locked");
+    }
+    args
+}
+
+fn emit_stream_output(app: &AppHandle, stream: &str, data: String) {
+    if data.is_empty() {
+        return;
+    }
+
+    let _ = app.emit(
+        "python-output",
+        PythonOutput {
+            stream: stream.to_string(),
+            data,
+        },
+    );
+}
+
+fn emit_command_streams(app: &AppHandle, output: &std::process::Output) {
+    emit_stream_output(
+        app,
+        "stdout",
+        String::from_utf8_lossy(&output.stdout).to_string(),
+    );
+    emit_stream_output(
+        app,
+        "stderr",
+        String::from_utf8_lossy(&output.stderr).to_string(),
+    );
 }
 
 /// Get the Python version string from a given python binary.
@@ -111,7 +259,7 @@ fn get_python_version(python_cmd: &str) -> Option<String> {
         })
 }
 
-fn ensure_uv_venv(app: &AppHandle, project_path: &str) -> Result<(), String> {
+fn ensure_uv_venv(app: &AppHandle, project_path: &str, uv_executable: &str) -> Result<(), String> {
     let venv_path = Path::new(project_path).join(".venv");
     if venv_path.exists() {
         return Ok(());
@@ -125,7 +273,7 @@ fn ensure_uv_venv(app: &AppHandle, project_path: &str) -> Result<(), String> {
         },
     );
 
-    let venv_output = Command::new("uv")
+    let venv_output = Command::new(uv_executable)
         .arg("venv")
         .current_dir(project_path)
         .output()
@@ -134,6 +282,48 @@ fn ensure_uv_venv(app: &AppHandle, project_path: &str) -> Result<(), String> {
     if !venv_output.status.success() {
         let stderr = String::from_utf8_lossy(&venv_output.stderr).to_string();
         return Err(format!("Failed to create venv: {}", stderr));
+    }
+
+    Ok(())
+}
+
+fn sync_uv_project_dependencies(
+    app: &AppHandle,
+    project_path: &str,
+    uv_executable: &str,
+) -> Result<(), String> {
+    let project_dir = Path::new(project_path);
+    if !project_dir.join("pyproject.toml").exists() {
+        return Ok(());
+    }
+
+    let args = build_uv_sync_args(project_dir);
+    let command_label = format!("uv {}", args.join(" "));
+
+    emit_stream_output(
+        app,
+        "stdout",
+        format!("Syncing Python dependencies with {}...\n", command_label),
+    );
+
+    let sync_output = Command::new(uv_executable)
+        .args(&args)
+        .current_dir(project_path)
+        .output()
+        .map_err(|e| format!("Failed to run '{}': {}", command_label, e))?;
+
+    emit_command_streams(app, &sync_output);
+
+    if !sync_output.status.success() {
+        let stderr = String::from_utf8_lossy(&sync_output.stderr)
+            .trim()
+            .to_string();
+        let detail = if stderr.is_empty() {
+            format!("exit code {:?}", sync_output.status.code())
+        } else {
+            stderr
+        };
+        return Err(format!("{} failed: {}", command_label, detail));
     }
 
     Ok(())
@@ -154,25 +344,22 @@ fn build_python_app_command(
     script_name: &str,
     host: &str,
     port: u16,
+    runtime: &PythonRuntime,
 ) -> Result<(TokioCommand, String), String> {
-    let mut command = if command_exists("uv") {
-        let mut cmd = TokioCommand::new("uv");
-        cmd.args(["run", "python", script_name]);
-        (cmd, "uv".to_string())
-    } else if command_exists("python3") {
-        let mut cmd = TokioCommand::new("python3");
-        cmd.arg(script_name);
-        (cmd, "python3".to_string())
-    } else if command_exists("python") {
-        let mut cmd = TokioCommand::new("python");
-        cmd.arg(script_name);
-        (cmd, "python".to_string())
-    } else {
-        return Err("No Python interpreter found. Install uv, python3, or python.".to_string());
+    let mut command = match runtime.kind {
+        PythonRuntimeKind::Uv => {
+            let mut cmd = TokioCommand::new(&runtime.executable);
+            cmd.args(["run", "python", script_name]);
+            cmd
+        }
+        PythonRuntimeKind::Python => {
+            let mut cmd = TokioCommand::new(&runtime.executable);
+            cmd.arg(script_name);
+            cmd
+        }
     };
 
     command
-        .0
         .current_dir(project_path)
         .env("PYTHONUNBUFFERED", "1")
         .env("DASH_HOST", host)
@@ -182,7 +369,7 @@ fn build_python_app_command(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    Ok(command)
+    Ok((command, runtime.display_name.clone()))
 }
 
 async fn stream_process_output<R>(app: AppHandle, stream: &'static str, reader: R)
@@ -338,13 +525,16 @@ fn spawn_readiness_probe(
 
 #[tauri::command]
 pub fn check_python_env(project_path: String) -> Result<PythonEnvInfo, String> {
-    let has_uv = command_exists("uv");
+    let uv_executable = resolve_uv_executable();
+    let python3_executable = resolve_python3_executable();
+    let python_executable = resolve_python_executable();
 
-    let has_python = command_exists("python3") || command_exists("python");
+    let has_uv = uv_executable.is_some();
+    let has_python = has_uv || python3_executable.is_some() || python_executable.is_some();
 
-    let python_version = if has_uv {
+    let python_version = if let Some(uv) = uv_executable {
         // Try getting version through uv
-        Command::new("uv")
+        Command::new(uv)
             .args(["python", "find"])
             .output()
             .ok()
@@ -356,10 +546,17 @@ pub fn check_python_env(project_path: String) -> Result<PythonEnvInfo, String> {
                     None
                 }
             })
-            .or_else(|| get_python_version("python3"))
-            .or_else(|| get_python_version("python"))
+            .or_else(|| {
+                python3_executable
+                    .as_deref()
+                    .and_then(get_python_version)
+                    .or_else(|| python_executable.as_deref().and_then(get_python_version))
+            })
     } else {
-        get_python_version("python3").or_else(|| get_python_version("python"))
+        python3_executable
+            .as_deref()
+            .and_then(get_python_version)
+            .or_else(|| python_executable.as_deref().and_then(get_python_version))
     };
 
     let has_venv = Path::new(&project_path).join(".venv").exists();
@@ -378,13 +575,15 @@ pub async fn run_python(
     project_path: String,
     script_name: String,
 ) -> Result<(), String> {
-    let has_uv = command_exists("uv");
+    let uv_executable = resolve_uv_executable();
+    let python3_executable = resolve_python3_executable();
+    let python_executable = resolve_python_executable();
     let project = project_path.clone();
     let script = script_name.clone();
 
     tokio::spawn(async move {
-        let result = if has_uv {
-            match run_with_uv(&app, &project, &script) {
+        let result = if let Some(uv) = uv_executable.as_deref() {
+            match run_with_uv(&app, &project, &script, uv) {
                 Ok(()) => Ok(()),
                 Err(uv_err) => {
                     let _ = app.emit(
@@ -398,10 +597,10 @@ pub async fn run_python(
                         },
                     );
 
-                    if command_exists("python3") {
-                        run_with_python(&app, &project, &script, "python3")
-                    } else if command_exists("python") {
-                        run_with_python(&app, &project, &script, "python")
+                    if let Some(python3) = python3_executable.as_deref() {
+                        run_with_python(&app, &project, &script, python3)
+                    } else if let Some(python) = python_executable.as_deref() {
+                        run_with_python(&app, &project, &script, python)
                     } else {
                         Err(format!(
                             "uv failed and no system Python was found. Original error: {}",
@@ -410,10 +609,10 @@ pub async fn run_python(
                     }
                 }
             }
-        } else if command_exists("python3") {
-            run_with_python(&app, &project, &script, "python3")
-        } else if command_exists("python") {
-            run_with_python(&app, &project, &script, "python")
+        } else if let Some(python3) = python3_executable.as_deref() {
+            run_with_python(&app, &project, &script, python3)
+        } else if let Some(python) = python_executable.as_deref() {
+            run_with_python(&app, &project, &script, python)
         } else {
             let _ = app.emit(
                 "python-output",
@@ -485,12 +684,25 @@ pub async fn run_python_app(
         )
     })?;
 
-    if command_exists("uv") {
-        ensure_uv_venv(&app, &project_path)?;
+    let runtime = resolve_python_runtime().ok_or_else(|| {
+        "No Python interpreter found. Install uv, python3, or python.".to_string()
+    })?;
+
+    if runtime.kind == PythonRuntimeKind::Uv {
+        ensure_uv_venv(&app, &project_path, &runtime.executable)?;
+        sync_uv_project_dependencies(&app, &project_path, &runtime.executable)?;
+    } else {
+        let _ = app.emit(
+            "python-output",
+            PythonOutput {
+                stream: "stderr".to_string(),
+                data: "uv was not found. Falling back to system Python; install uv for automatic dependency sync.\n".to_string(),
+            },
+        );
     }
 
     let (mut command, runtime_name) =
-        build_python_app_command(&project_path, &script_name, &host, selected_port)?;
+        build_python_app_command(&project_path, &script_name, &host, selected_port, &runtime)?;
 
     let mut child = command
         .spawn()
@@ -600,11 +812,16 @@ pub async fn stop_python_app(
     Ok(())
 }
 
-fn run_with_uv(app: &AppHandle, project_path: &str, script_name: &str) -> Result<(), String> {
-    ensure_uv_venv(app, project_path)?;
+fn run_with_uv(
+    app: &AppHandle,
+    project_path: &str,
+    script_name: &str,
+    uv_executable: &str,
+) -> Result<(), String> {
+    ensure_uv_venv(app, project_path, uv_executable)?;
 
     // Run the script with uv run
-    let output = Command::new("uv")
+    let output = Command::new(uv_executable)
         .args(["run", "python", script_name])
         .current_dir(project_path)
         .output()
@@ -631,28 +848,7 @@ fn run_with_python(
 }
 
 fn emit_process_output(app: &AppHandle, output: &std::process::Output) {
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-
-    if !stdout.is_empty() {
-        let _ = app.emit(
-            "python-output",
-            PythonOutput {
-                stream: "stdout".to_string(),
-                data: stdout,
-            },
-        );
-    }
-
-    if !stderr.is_empty() {
-        let _ = app.emit(
-            "python-output",
-            PythonOutput {
-                stream: "stderr".to_string(),
-                data: stderr,
-            },
-        );
-    }
+    emit_command_streams(app, output);
 
     let code = output.status.code();
     let _ = app.emit(
@@ -662,4 +858,101 @@ fn emit_process_output(app: &AppHandle, output: &std::process::Output) {
             success: output.status.success(),
         },
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
+
+    fn create_temp_dir(prefix: &str) -> PathBuf {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "interactive-studio-python-{}-{}-{}",
+            prefix,
+            std::process::id(),
+            timestamp
+        ));
+        fs::create_dir_all(&dir).expect("temp dir should be created");
+        dir
+    }
+
+    fn remove_temp_dir(path: &Path) {
+        let _ = fs::remove_dir_all(path);
+    }
+
+    #[cfg(unix)]
+    fn write_executable_script(path: &Path) {
+        fs::write(path, "#!/bin/sh\nexit 0\n").expect("script should be written");
+        let mut permissions = fs::metadata(path)
+            .expect("script metadata should exist")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(path, permissions).expect("script should be executable");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn resolve_executable_from_candidates_uses_absolute_candidate() {
+        let temp_dir = create_temp_dir("uv-home");
+        let uv_path = temp_dir.join("uv");
+        write_executable_script(&uv_path);
+
+        let resolved = resolve_executable_from_candidates(
+            "definitely-not-real-uv-command",
+            &["--version"],
+            &[uv_path.clone()],
+        );
+
+        assert_eq!(resolved, Some(uv_path.to_string_lossy().into_owned()));
+        remove_temp_dir(&temp_dir);
+    }
+
+    #[test]
+    fn select_python_runtime_prefers_uv_when_available() {
+        let runtime = select_python_runtime(
+            Some("uv".to_string()),
+            Some("python3".to_string()),
+            Some("python".to_string()),
+        )
+        .expect("runtime should resolve");
+
+        assert_eq!(runtime.kind, PythonRuntimeKind::Uv);
+        assert_eq!(runtime.display_name, "uv");
+        assert_eq!(runtime.executable, "uv");
+    }
+
+    #[test]
+    fn select_python_runtime_falls_back_to_python3_without_uv() {
+        let runtime = select_python_runtime(None, Some("python3".to_string()), None)
+            .expect("runtime should resolve");
+
+        assert_eq!(runtime.kind, PythonRuntimeKind::Python);
+        assert_eq!(runtime.display_name, "python3");
+        assert_eq!(runtime.executable, "python3");
+    }
+
+    #[test]
+    fn build_uv_sync_args_uses_locked_sync_when_lock_exists() {
+        let temp_dir = create_temp_dir("sync-locked");
+        fs::write(temp_dir.join("uv.lock"), "").expect("lock file should be created");
+
+        assert_eq!(build_uv_sync_args(&temp_dir), vec!["sync", "--locked"]);
+        remove_temp_dir(&temp_dir);
+    }
+
+    #[test]
+    fn build_uv_sync_args_uses_sync_without_lock() {
+        let temp_dir = create_temp_dir("sync");
+        assert_eq!(build_uv_sync_args(&temp_dir), vec!["sync"]);
+        remove_temp_dir(&temp_dir);
+    }
 }

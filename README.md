@@ -8,7 +8,7 @@ Write code in an editor pane and see results instantly: live HTML preview, conso
 
 - **Multi-language support**: HTML/CSS/JS, TypeScript/JSX/TSX, Python, Markdown, Mermaid, SVG, JSON
 - **Live preview**: Auto-refreshing iframe sandbox for web code, rendered previews for markdown/diagrams
-- **Python execution**: Runs via `uv` with per-project venvs, falls back to system Python or Pyodide (WASM)
+- **Python execution**: Runs via `uv` with per-project venvs, falls back to system Python when needed
 - **Python app preview**: Detects Dash/FastAPI apps, starts a local server, and embeds it in the preview pane with Run/Stop controls
 - **File management**: Full file tree with create, rename, delete operations
 - **CodeMirror 6 editor**: Syntax highlighting, autocomplete, bracket matching, multi-tab support
@@ -88,5 +88,6 @@ The `workspace/` directory ships with several example projects that demonstrate 
 
 These projects are auto-discovered at startup. Drop any folder into `workspace/` to add your own.
 In production builds, if `$HOME/interactive-studio/workspace` is missing on first launch, the app seeds these bundled examples automatically. Existing workspaces are not overwritten.
+For Python web-app examples (Dash/FastAPI), the runtime resolves `uv` from PATH and common macOS install paths (`$HOME/.local/bin/uv`, `/opt/homebrew/bin/uv`, `/usr/local/bin/uv`) and runs `uv sync` before app startup when `pyproject.toml` is present.
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed architecture documentation.
