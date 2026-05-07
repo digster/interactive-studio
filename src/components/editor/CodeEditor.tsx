@@ -10,7 +10,12 @@ import {
   syntaxHighlighting,
   defaultHighlightStyle,
 } from '@codemirror/language';
-import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
+import {
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  completionKeymap,
+} from '@codemirror/autocomplete';
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useEditorStore } from '../../store/editorStore';
@@ -78,9 +83,22 @@ export default function CodeEditor({ content, language, tabId }: CodeEditorProps
         // other highlighter (i.e. dark mode) is loaded.
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         closeBrackets(),
+        // Keyword/identifier suggestions sourced from each language pack's
+        // built-in completion source. `defaultKeymap: false` keeps the
+        // extension's bindings out so we can register `completionKeymap`
+        // explicitly below in the desired priority order.
+        autocompletion({
+          activateOnTyping: true,
+          closeOnBlur: true,
+          icons: true,
+          defaultKeymap: false,
+        }),
         highlightSelectionMatches(),
         history(),
         keymap.of([
+          // `completionKeymap` first so Tab/Enter/Esc act on the completion
+          // popup when it's open, before falling back to default editing keys.
+          ...completionKeymap,
           ...defaultKeymap,
           ...historyKeymap,
           ...closeBracketsKeymap,
