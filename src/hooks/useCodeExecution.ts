@@ -6,6 +6,7 @@ import { useUIStore } from '../store/uiStore';
 import * as tauriFS from '../lib/tauriFS';
 import { getPreviewType } from '../lib/languageDetect';
 import { isTauriRuntime } from '../lib/runtime';
+import { handlePreviewMessage } from '../lib/previewBridge';
 
 const TRACEBACK_RE = /File "(.+)", line (\d+)/;
 const DASH_IMPORT_RE = /\b(from\s+dash\s+import|import\s+dash)\b/i;
@@ -61,6 +62,14 @@ function resolvePythonExecutionTarget(
 
 export function useCodeExecution() {
   const unlistenersRef = useRef<(() => void)[]>([]);
+
+  // Bridge: forward console + runtime errors from preview iframes into the
+  // execution store. Mounted unconditionally (not Tauri-gated) so it works
+  // in the Vite browser dev runtime too.
+  useEffect(() => {
+    window.addEventListener('message', handlePreviewMessage);
+    return () => window.removeEventListener('message', handlePreviewMessage);
+  }, []);
 
   // Set up Tauri event listeners for Python output/exit
   useEffect(() => {
@@ -143,9 +152,16 @@ export function useCodeExecution() {
 
     const pvType = getPreviewType(activeTab.language);
 
-    // For web languages, just refresh the preview
+    // For web languages: clear the slate, surface the console panel, and
+    // refresh the preview. The bridge inside the iframe will repopulate
+    // Console/Problems on the next load.
     if (pvType === 'html' && activeTab.language !== 'python') {
-      useExecutionStore.getState().requestRefresh();
+      const store = useExecutionStore.getState();
+      store.clearConsole();
+      store.clearProblems();
+      useUIStore.getState().setBottomPanelVisible(true);
+      useUIStore.getState().setBottomPanelActiveTab('console');
+      store.requestRefresh();
       return;
     }
 

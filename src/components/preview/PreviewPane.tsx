@@ -59,6 +59,16 @@ export default function PreviewPane() {
   const previewType = useExecutionStore((s) => s.previewType);
   const previewUrl = useExecutionStore((s) => s.previewUrl);
   const requestRefresh = useExecutionStore((s) => s.requestRefresh);
+  const clearConsole = useExecutionStore((s) => s.clearConsole);
+  const clearProblems = useExecutionStore((s) => s.clearProblems);
+
+  // Each iframe load is a fresh execution context — wipe console and
+  // problems so messages don't accumulate across edits. Scoped to the html
+  // preview iframe; Python output uses a separate iframe in PythonPreview.
+  const handleHtmlIframeLoad = () => {
+    clearConsole();
+    clearProblems();
+  };
 
   const hasContent =
     previewType !== 'none' && previewType !== 'python' && previewType !== 'url' && previewContent.length > 0;
@@ -104,6 +114,7 @@ export default function PreviewPane() {
               sandbox="allow-scripts"
               title="Preview"
               className="w-full h-full border-0 bg-white"
+              onLoad={handleHtmlIframeLoad}
             />
           ) : previewType === 'svg' ? (
             <div

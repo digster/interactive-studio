@@ -77,7 +77,7 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 ### Editor Components (src/components/editor/)
 - **EditorPane.tsx** - TabBar + run toolbar (visible for executable files) + CodeEditor. Run toolbar has Run, and when a Python app is active it shows a Stop button. ⌘+Enter runs, and in app mode it stops the active app.
 - **TabBar.tsx** - Horizontal scrollable tabs with file icons, modified dot indicator, close buttons. Tabs are draggable (HTML5 native drag-and-drop) and reorder via the `reorderTabs` store action; an absolute-positioned `--accent`-colored indicator marks the drop target on hover.
-- **CodeEditor.tsx** - CodeMirror 6 React wrapper using Compartment-based dynamic reconfiguration for theme, language, tabSize, wordWrap, and fontSize. Registers `syntaxHighlighting(defaultHighlightStyle, { fallback: true })` as a non-compartmented extension so light mode gets default token colors while `oneDark` (which bundles its own highlighter) takes over in dark mode without conflict.
+- **CodeEditor.tsx** - CodeMirror 6 React wrapper using Compartment-based dynamic reconfiguration for theme, language, tabSize, **indentUnit**, wordWrap, and fontSize. Registers `syntaxHighlighting(defaultHighlightStyle, { fallback: true })` as a non-compartmented extension so light mode gets default token colors while `oneDark` (which bundles its own highlighter) takes over in dark mode without conflict. The `indentUnit` compartment is wired alongside `EditorState.tabSize` from the same `tabSize` setting — `tabSize` only controls the visual width of `\t`, while `indentUnit` is what `indentMore`/`indentWithTab`/`indentOnInput` actually insert. They're updated in a single dispatch when the setting changes.
 - **cmLanguages.ts** - Maps language strings to CodeMirror language extensions.
 - **cmTheme.ts** - Light/dark theme creation for CodeMirror.
 
@@ -110,7 +110,9 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 
 ### Utilities (src/lib/)
 - **tauriFS.ts** - Tauri IPC wrappers for filesystem commands
-- **previewBuilder.ts** - Builds self-contained HTML for iframe preview by inlining `<link>` and `<script src>` assets. Reads content from open editor tabs (unsaved edits) first, falls back to disk via `invoke('read_file')`. Skips external URLs.
+- **previewBuilder.ts** - Builds self-contained HTML for iframe preview by inlining `<link>` and `<script src>` assets. Reads content from open editor tabs (unsaved edits) first, falls back to disk via `invoke('read_file')`. Skips external URLs. For each inlined script: plain `.js` is wrapped with a `//# sourceURL=<absolute path>` pragma so iframe-side errors carry a real file path; `.ts/.tsx/.jsx` is transpiled via `previewTranspile` and emitted as `<script type="module">`. Transpile failures become an inert `postMessage` that surfaces in Problems instead of a broken script tag. Finally, injects `BRIDGE_SCRIPT` from `previewBridge` as the first child of `<head>` so it installs before any user script.
+- **previewBridge.ts** - Two-way Console/Problems bridge for preview iframes. `BRIDGE_SCRIPT` (an inline-script string) wraps `console.log/info/warn/error/debug`, attaches `error` and `unhandledrejection` handlers, serializes args safely (Errors, circular refs, BigInt, functions), and posts envelopes `{ __previewBridge: true, kind: 'console' | 'error' | 'unhandledrejection', ... }` to `window.parent` with `targetOrigin: '*'` (the sandbox's opaque origin precludes a stricter target). `handlePreviewMessage` validates the marker and routes envelopes to `addConsoleEntry` and (for errors) `addProblem`. The parent listener is mounted in `useCodeExecution`'s setup effect so it's a session-scoped singleton.
+- **previewTranspile.ts** - Lazy-initialized `esbuild-wasm` wrapper. `transpile(code, language, absoluteFilePath)` returns transpiled JS with an inline source map (so Chromium can rewrite `error.stack` to original lines) plus an explicit `//# sourceURL=...` for engines that ignore the map. Initialization is memoized in a module-level promise; failed init clears the cache so a retry can re-attempt. `jsx: 'automatic'` lets user code skip the explicit React import. Errors are rethrown as a normalized `{ message, file, line, column }` (column is bumped from esbuild's 0-based to 1-based to match editor expectations).
 - **languageDetect.ts** - File extension to language mapping, preview type detection, executable language check
 - **fileIcons.ts** - File extension to icon mapping
 - **runtime.ts** - Runtime detection helpers (`isTauriRuntime`) compatible with both Tauri v2 (`globalThis.isTauri` / `__TAURI_INTERNALS__`) and legacy globals.
@@ -128,9 +130,18 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 ### Live Preview
 1. `usePreview` hook watches editor state (tabs, activeTabId, previewRefreshKey)
 2. On change, debounces 300ms then calls `buildHtmlPreview()`
-3. Preview builder reads active HTML tab content, inlines CSS/JS from open tabs or disk
-4. Resulting HTML set as iframe `srcdoc` with `sandbox="allow-scripts"`
+3. Preview builder reads active HTML tab content, inlines CSS/JS from open tabs or disk; transpiles `.ts/.tsx/.jsx` via `esbuild-wasm`; injects `BRIDGE_SCRIPT` so the iframe can post `console.*` and runtime errors back to the host
+4. Resulting HTML set as iframe `srcdoc` with `sandbox="allow-scripts"`. The iframe's `onLoad` clears Console/Problems so each reload starts clean — user-side `addConsoleEntry`/`addProblem` calls then come from the bridge listener registered in `useCodeExecution`
 5. Refresh button triggers `requestRefresh()` which increments previewRefreshKey
+
+### Preview ↔ Host Bridge (Console / Problems for JS, TS, JSX, TSX)
+1. `BRIDGE_SCRIPT` (from `previewBridge.ts`) is injected as the first `<script>` after `<head>`
+2. Inside the iframe it wraps `console.*`, captures `error` and `unhandledrejection`, serializes args, and posts `{ __previewBridge: true, kind, ... }` envelopes to `window.parent` (`targetOrigin: '*'` because the sandbox iframe has an opaque `null` origin)
+3. `handlePreviewMessage` (registered once in `useCodeExecution`'s setup effect) filters by the `__previewBridge` marker and dispatches:
+   - `kind: 'console'` → `addConsoleEntry(level, content)`
+   - `kind: 'error' | 'unhandledrejection'` → `addConsoleEntry('error', message)` AND `addProblem('error', message, file, line, column)`
+4. Inlined `<script src>` references are augmented with `//# sourceURL=<absolute path>`; TS/JSX/TSX scripts are transpiled with `sourcemap: 'inline'` so `error.stack` is rewritten to original lines by Chromium. The parent's bridge prefers the stack-parsed file/line/col over `event.lineno` so Problems shows the source-mapped location
+5. `ProblemRow.handleClick` opens `problem.filePath` via `tauriFS.readFile` + `editorStore.openFile` — works unchanged because `sourceURL` is an absolute path
 
 ### Python Execution
 1. User clicks run on a Python file.

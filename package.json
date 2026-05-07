@@ -32,6 +32,7 @@
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-shell": "^2",
     "clsx": "^2.1.0",
+    "esbuild-wasm": "^0.28.0",
     "lucide-react": "^0.500.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

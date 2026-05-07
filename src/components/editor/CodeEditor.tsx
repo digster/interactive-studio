@@ -7,6 +7,7 @@ import {
   foldGutter,
   foldKeymap,
   indentOnInput,
+  indentUnit,
   syntaxHighlighting,
   defaultHighlightStyle,
 } from '@codemirror/language';
@@ -34,6 +35,7 @@ export default function CodeEditor({ content, language, tabId }: CodeEditorProps
   const themeCompartment = useRef(new Compartment());
   const languageCompartment = useRef(new Compartment());
   const tabSizeCompartment = useRef(new Compartment());
+  const indentUnitCompartment = useRef(new Compartment());
   const wordWrapCompartment = useRef(new Compartment());
   const fontSizeCompartment = useRef(new Compartment());
 
@@ -109,6 +111,11 @@ export default function CodeEditor({ content, language, tabId }: CodeEditorProps
         themeCompartment.current.of(themeExt),
         languageCompartment.current.of(langExt ?? []),
         tabSizeCompartment.current.of(EditorState.tabSize.of(settings.tabSize)),
+        // `EditorState.tabSize` controls only the *visual* width of \t.
+        // `indentUnit` is what `indentMore`/`indentWithTab`/`indentOnInput`
+        // actually insert — wire it to the same setting so 2/4 means
+        // "indent with 2/4 spaces", which is what users expect.
+        indentUnitCompartment.current.of(indentUnit.of(' '.repeat(settings.tabSize))),
         wordWrapCompartment.current.of(settings.wordWrap ? EditorView.lineWrapping : []),
         fontSizeCompartment.current.of(
           EditorView.theme({ '.cm-content': { fontSize: `${settings.fontSize}px` }, '.cm-gutters': { fontSize: `${settings.fontSize}px` } }),
@@ -151,11 +158,15 @@ export default function CodeEditor({ content, language, tabId }: CodeEditorProps
     });
   }, [fontSize]);
 
-  // Reconfigure tab size when it changes
+  // Reconfigure tab size when it changes — both the visual tab width and
+  // the actual indent unit used by the indentation commands.
   useEffect(() => {
     if (!viewRef.current) return;
     viewRef.current.dispatch({
-      effects: tabSizeCompartment.current.reconfigure(EditorState.tabSize.of(tabSize)),
+      effects: [
+        tabSizeCompartment.current.reconfigure(EditorState.tabSize.of(tabSize)),
+        indentUnitCompartment.current.reconfigure(indentUnit.of(' '.repeat(tabSize))),
+      ],
     });
   }, [tabSize]);
 
