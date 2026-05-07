@@ -75,4 +75,63 @@ describe('TabBar', () => {
     const dot = container.querySelector('.rounded-full');
     expect(dot).toBeInTheDocument();
   });
+
+  it('should reorder tabs via drag-and-drop', () => {
+    useEditorStore.setState({
+      tabs: [
+        createTab('/a.ts', 'a.ts'),
+        createTab('/b.ts', 'b.ts'),
+        createTab('/c.ts', 'c.ts'),
+      ],
+      activeTabId: '/a.ts',
+    });
+    render(<TabBar />);
+
+    const sourceTab = screen.getByText('a.ts').closest('[role="tab"]') as HTMLElement;
+    const targetTab = screen.getByText('c.ts').closest('[role="tab"]') as HTMLElement;
+
+    // jsdom doesn't implement DataTransfer; provide a minimal stub that mirrors
+    // the get/set contract our handlers use.
+    const data = new Map<string, string>();
+    const dataTransfer = {
+      effectAllowed: 'move',
+      dropEffect: 'move',
+      setData: (type: string, value: string) => {
+        data.set(type, value);
+      },
+      getData: (type: string) => data.get(type) ?? '',
+    };
+
+    fireEvent.dragStart(sourceTab, { dataTransfer });
+    fireEvent.dragOver(targetTab, { dataTransfer });
+    fireEvent.drop(targetTab, { dataTransfer });
+
+    const orderedIds = useEditorStore.getState().tabs.map((t) => t.id);
+    expect(orderedIds).toEqual(['/b.ts', '/c.ts', '/a.ts']);
+  });
+
+  it('should leave tabs unchanged when dropped on the source tab', () => {
+    useEditorStore.setState({
+      tabs: [createTab('/a.ts', 'a.ts'), createTab('/b.ts', 'b.ts')],
+      activeTabId: '/a.ts',
+    });
+    render(<TabBar />);
+
+    const tabA = screen.getByText('a.ts').closest('[role="tab"]') as HTMLElement;
+    const data = new Map<string, string>();
+    const dataTransfer = {
+      effectAllowed: 'move',
+      dropEffect: 'move',
+      setData: (type: string, value: string) => {
+        data.set(type, value);
+      },
+      getData: (type: string) => data.get(type) ?? '',
+    };
+
+    fireEvent.dragStart(tabA, { dataTransfer });
+    fireEvent.drop(tabA, { dataTransfer });
+
+    const orderedIds = useEditorStore.getState().tabs.map((t) => t.id);
+    expect(orderedIds).toEqual(['/a.ts', '/b.ts']);
+  });
 });

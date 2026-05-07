@@ -76,8 +76,8 @@ Interactive Studio is a Tauri 2 desktop application (Rust backend + React/TypeSc
 
 ### Editor Components (src/components/editor/)
 - **EditorPane.tsx** - TabBar + run toolbar (visible for executable files) + CodeEditor. Run toolbar has Run, and when a Python app is active it shows a Stop button. ⌘+Enter runs, and in app mode it stops the active app.
-- **TabBar.tsx** - Horizontal scrollable tabs with file icons, modified dot indicator, close buttons.
-- **CodeEditor.tsx** - CodeMirror 6 React wrapper using Compartment-based dynamic reconfiguration for theme, language, tabSize, wordWrap, and fontSize.
+- **TabBar.tsx** - Horizontal scrollable tabs with file icons, modified dot indicator, close buttons. Tabs are draggable (HTML5 native drag-and-drop) and reorder via the `reorderTabs` store action; an absolute-positioned `--accent`-colored indicator marks the drop target on hover.
+- **CodeEditor.tsx** - CodeMirror 6 React wrapper using Compartment-based dynamic reconfiguration for theme, language, tabSize, wordWrap, and fontSize. Registers `syntaxHighlighting(defaultHighlightStyle, { fallback: true })` as a non-compartmented extension so light mode gets default token colors while `oneDark` (which bundles its own highlighter) takes over in dark mode without conflict.
 - **cmLanguages.ts** - Maps language strings to CodeMirror language extensions.
 - **cmTheme.ts** - Light/dark theme creation for CodeMirror.
 

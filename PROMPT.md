@@ -163,3 +163,10 @@ Implement the plan.
 ---
 
 Fix HTML Preview JavaScript not working in production. Add `dangerousDisableAssetCspModification` to Tauri security config to prevent nonce replacement of `'unsafe-inline'` in production builds.
+
+---
+
+## 2026-05-06
+
+* Enable syntax highlighting for the code.
+* Allow rearranging of the code tabs.

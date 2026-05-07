@@ -2,7 +2,14 @@ import { useEffect, useRef } from 'react';
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection } from '@codemirror/view';
 import { EditorState, Compartment } from '@codemirror/state';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
-import { bracketMatching, foldGutter, foldKeymap, indentOnInput } from '@codemirror/language';
+import {
+  bracketMatching,
+  foldGutter,
+  foldKeymap,
+  indentOnInput,
+  syntaxHighlighting,
+  defaultHighlightStyle,
+} from '@codemirror/language';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -66,6 +73,10 @@ export default function CodeEditor({ content, language, tabId }: CodeEditorProps
         foldGutter(),
         indentOnInput(),
         bracketMatching(),
+        // Fallback syntax highlighting for light mode. `oneDark` ships its own
+        // highlighter, so { fallback: true } makes this only activate when no
+        // other highlighter (i.e. dark mode) is loaded.
+        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         closeBrackets(),
         highlightSelectionMatches(),
         history(),
